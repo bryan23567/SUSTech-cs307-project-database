@@ -1,13 +1,37 @@
-package main.interfaces;
+package NoMathExpectation.cs307.project2.interfaces;
+
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
+
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 
 public class DBManipulation implements IDatabaseManipulation{
-    public String database;
-    public String root;
-    public String pass;
+    private final DataSource source;
+
     public DBManipulation(String database, String root, String pass){
-        this.database = database;
-        this.root = root;
-        this.pass = pass;
+        HikariConfig config = new HikariConfig();
+        config.setJdbcUrl("jdbc:mysql://localhost:3306/" + database);
+        config.setUsername(root);
+        config.setPassword(pass);
+        source = new HikariDataSource(config);
+    }
+
+    private static final String CHECK_LOG = "SELECT Type FROM staffs WHERE Name = ? AND password = ? AND type = ?";
+    public boolean checkLog(LogInfo log){
+        try (Connection conn = source.getConnection()) {
+            try (PreparedStatement ps = conn.prepareStatement(CHECK_LOG)) {
+                ps.setString(1, log.name());
+                ps.setString(2, log.password());
+                ps.setString(3, log.type().toString());
+                return ps.executeQuery().next();
+            }
+        } catch (SQLException sqlException) {
+            sqlException.printStackTrace();
+            return false;
+        }
     }
 
     @Override

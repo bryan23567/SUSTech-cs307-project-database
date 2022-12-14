@@ -1,4 +1,4 @@
-package main.interfaces;
+package NoMathExpectation.cs307.project2.interfaces;
 
 public interface ISustcManager {
 	int getCompanyCount(LogInfo log);

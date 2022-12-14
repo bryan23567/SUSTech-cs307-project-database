@@ -1,4 +1,4 @@
-package main.interfaces;
+package NoMathExpectation.cs307.project2.interfaces;
 
 /*
  * <p>

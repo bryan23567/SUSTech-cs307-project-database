@@ -1,6 +1,6 @@
 package test;
 
-import main.interfaces.*;
+import NoMathExpectation.cs307.project2.interfaces.*;
 import org.junit.jupiter.api.*;
 import test.answers.*;
 

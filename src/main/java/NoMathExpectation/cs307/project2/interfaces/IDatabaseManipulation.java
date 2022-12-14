@@ -1,4 +1,4 @@
-package main.interfaces;
+package NoMathExpectation.cs307.project2.interfaces;
 
 public interface IDatabaseManipulation extends ISustcManager, ICourier, ICompanyManager, ISeaportOfficer {
 	// Your implemented class shall have constructor like:

@@ -2,6 +2,8 @@ package NoMathExpectation.cs307.project2.interfaces;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -11,26 +13,37 @@ import java.sql.SQLException;
 public class DBManipulation implements IDatabaseManipulation{
     private final DataSource source;
 
-    public DBManipulation(String database, String root, String pass){
+    public DBManipulation(@NotNull String database, @NotNull String root, @NotNull String pass){
         HikariConfig config = new HikariConfig();
-        config.setJdbcUrl("jdbc:mysql://localhost:3306/" + database);
+        config.setJdbcUrl("jdbc:postgresql://localhost:5432/" + database);
         config.setUsername(root);
         config.setPassword(pass);
         source = new HikariDataSource(config);
     }
 
     private static final String CHECK_LOG = "SELECT Type FROM staffs WHERE Name = ? AND password = ? AND type = ?";
-    public boolean checkLog(LogInfo log){
-        try (Connection conn = source.getConnection()) {
-            try (PreparedStatement ps = conn.prepareStatement(CHECK_LOG)) {
+    public boolean checkLog(@NotNull LogInfo log, @Nullable LogInfo.StaffType type){
+        try (Connection connection = source.getConnection()) {
+            try (PreparedStatement ps = connection.prepareStatement(CHECK_LOG)) {
                 ps.setString(1, log.name());
                 ps.setString(2, log.password());
                 ps.setString(3, log.type().toString());
-                return ps.executeQuery().next();
+                return ps.executeQuery().next() && log.type() == type;
             }
         } catch (SQLException sqlException) {
             sqlException.printStackTrace();
             return false;
+        }
+    }
+
+    private int getInt(@NotNull String sql) {
+        try (Connection connection = source.getConnection()) {
+            try (PreparedStatement ps = connection.prepareStatement(sql)) {
+                return ps.executeQuery().getInt(1);
+            }
+        } catch (SQLException sqlException) {
+            sqlException.printStackTrace();
+            return -1;
         }
     }
 
@@ -94,24 +107,44 @@ public class DBManipulation implements IDatabaseManipulation{
         return false;
     }
 
+    private static final String GET_COMPANY_COUNT = "SELECT count(*) FROM company";
     @Override
     public int getCompanyCount(LogInfo log) {
-        return 0;
+        if (!checkLog(log, LogInfo.StaffType.SustcManager)) {
+            return -1;
+        }
+
+        return getInt(GET_COMPANY_COUNT);
     }
 
+    private static final String GET_CITY_COUNT = "SELECT count(*) FROM city";
     @Override
     public int getCityCount(LogInfo log) {
-        return 0;
+        if (!checkLog(log, LogInfo.StaffType.SustcManager)) {
+            return -1;
+        }
+
+        return getInt(GET_CITY_COUNT);
     }
 
+    private static final String GET_COURIER_COUNT = "SELECT count(*) FROM staff WHERE type = 'Courier'";
     @Override
     public int getCourierCount(LogInfo log) {
-        return 0;
+        if (!checkLog(log, LogInfo.StaffType.SustcManager)) {
+            return -1;
+        }
+
+        return getInt(GET_COURIER_COUNT);
     }
 
+    private static final String GET_SHIP_COUNT = "SELECT count(*) FROM ship";
     @Override
     public int getShipCount(LogInfo log) {
-        return 0;
+        if (!checkLog(log, LogInfo.StaffType.SustcManager)) {
+            return -1;
+        }
+
+        return getInt(GET_SHIP_COUNT);
     }
 
     @Override

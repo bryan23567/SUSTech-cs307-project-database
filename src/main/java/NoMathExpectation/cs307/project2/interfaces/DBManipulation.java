@@ -110,7 +110,7 @@ public class DBManipulation implements IDatabaseManipulation{
 
     private static final String GET_COMPANY_COUNT = "SELECT count(*) FROM company";
     @Override
-    public int getCompanyCount(LogInfo log) {
+    public int getCompanyCount(@NotNull LogInfo log) {
         if (!checkLog(log, LogInfo.StaffType.SustcManager)) {
             return -1;
         }
@@ -120,7 +120,7 @@ public class DBManipulation implements IDatabaseManipulation{
 
     private static final String GET_CITY_COUNT = "SELECT count(*) FROM city";
     @Override
-    public int getCityCount(LogInfo log) {
+    public int getCityCount(@NotNull LogInfo log) {
         if (!checkLog(log, LogInfo.StaffType.SustcManager)) {
             return -1;
         }
@@ -130,7 +130,7 @@ public class DBManipulation implements IDatabaseManipulation{
 
     private static final String GET_COURIER_COUNT = "SELECT count(*) FROM staff WHERE type = 'Courier'";
     @Override
-    public int getCourierCount(LogInfo log) {
+    public int getCourierCount(@NotNull LogInfo log) {
         if (!checkLog(log, LogInfo.StaffType.SustcManager)) {
             return -1;
         }
@@ -140,7 +140,7 @@ public class DBManipulation implements IDatabaseManipulation{
 
     private static final String GET_SHIP_COUNT = "SELECT count(*) FROM ship";
     @Override
-    public int getShipCount(LogInfo log) {
+    public int getShipCount(@NotNull LogInfo log) {
         if (!checkLog(log, LogInfo.StaffType.SustcManager)) {
             return -1;
         }
@@ -178,7 +178,7 @@ public class DBManipulation implements IDatabaseManipulation{
             where it.name = ?
             """;
     @Override
-    public ItemInfo getItemInfo(LogInfo log, String name) {
+    public @Nullable ItemInfo getItemInfo(@NotNull LogInfo log, @NotNull String name) {
         if (!checkLog(log, LogInfo.StaffType.SustcManager)) {
             return null;
         }

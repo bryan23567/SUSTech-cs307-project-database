@@ -1,4 +1,4 @@
-package NoMathExpectation.cs307.project2.interfaces;
+package main.interfaces;
 
 public interface ICourier {
 	boolean newItem(LogInfo log, ItemInfo item);

@@ -1,7 +1,8 @@
-package NoMathExpectation.cs307.project2.interfaces;
+package main;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import main.interfaces.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -11,7 +12,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
-public class DBManipulation implements IDatabaseManipulation{
+public class DBManipulation implements IDatabaseManipulation {
     private final DataSource source;
 
     public DBManipulation(@NotNull String database, @NotNull String root, @NotNull String pass){
@@ -20,120 +21,126 @@ public class DBManipulation implements IDatabaseManipulation{
         config.setUsername(root);
         config.setPassword(pass);
         source = new HikariDataSource(config);
-        Connection connection = null;
-        try{
-            connection = source.getConnection();
-            connection.createStatement().execute("create table Company\n" +
+        createTables();
+    }
 
-                    "    (Id   serial primary key,\n" +
-                    "    Name varchar(255) not null unique,\n" +
-                    "    check (Name <> N'')\n" +
-                    ");");
-
-            connection.createStatement().execute("create table City" +
-                    "    (Id   serial primary key," +
-                    "    Name varchar(255) not null unique," +
-                    "    check (Name <>N'')" +
-                    ");");
-            connection.createStatement().execute("create table staff" +
-
-                    "    (Id           serial primary key," +
-                    "    Name         varchar(255) not null," +
-                    "    Type         varchar(10)  not null," +
-                    "    Age          int          not null," +
-                    "    Company_Id   int," +
-                    "    City_id      int," +
-                    "    Gender       varchar(10)," +
-                    "    Phone_Number numeric(11, 0)," +
-                    "    Password     numeric(19, 0)," +
-                    "    FOREIGN KEY (Company_Id) references Company (Id)," +
-                    "    FOREIGN KEY (City_id) references City (Id)" +
-                    ");");
-            connection.createStatement().execute("create table Item\n" +
-
-                    "    (Id    serial primary key," +
-                    "    Name  varchar(255)  not null unique," +
-                    "    Class varchar(255)  not null," +
-                    "    Price numeric(9, 0) not null," +
-                    "    check ( Price > 0 and Class <> N'' and Name <> N'')" +
-                    ");");
-            connection.createStatement().execute("create table Ship"+
-                    "    (Id         serial primary key," +
-                    "    Name       varchar(255) not null unique," +
-                    "    Company_Id int          not null," +
-                    "    FOREIGN KEY (Company_Id) references Company (Id)" +
-                    ");");
-            connection.createStatement().execute("create table Container" +
-
-                    "    (Id   serial primary key," +
-                    "    Code varchar(8) not null unique," +
-                    "    Type varchar(100)" +
-                    ");");
-            connection.createStatement().execute("create table export\n" +
-
-                    "    (Id      serial not null primary key," +
-                    "    City_Id serial not null," +
-                    "    Tax     numeric(15, 8)," +
-                    "    Officer varchar(30)," +
-                    "    FOREIGN KEY (City_Id) references City (Id)" +
-                    ");");
-            connection.createStatement().execute("create table import" +
-
-                    "    (Id      serial not null primary key," +
-                    "    City_Id serial not null," +
-                    "    Tax     numeric(15, 8)," +
-                    "    Officer varchar(30)," +
-                    "    FOREIGN KEY (City_Id) references City (Id)" +
-                    ");");
-            connection.createStatement().execute("create table Shipping" +
-
-                    "    (Id           serial primary key," +
-                    "    Item_Id      int not null," +
-                    "    Export_Id    int not null," +
-                    "    Import_Id    int not null," +
-                    "    Ship_Id      int," +
-                    "    Container_Id int," +
-                    "    Item_State   varchar(50)," +
-                    "    FOREIGN KEY (Export_Id) references export (Id)," +
-                    "    FOREIGN KEY (Import_Id) references import (Id)," +
-                    "    FOREIGN KEY (Item_Id) references item (Id)," +
-                    "    FOREIGN KEY (Ship_Id) references Ship (Id)," +
-                    "    FOREIGN KEY (Container_Id) references Container (Id)" +
-                    ");");
-            connection.createStatement().execute("create table Retrieval" +
-
-                    "    (Id          serial primary key," +
-                    "    Shipping_Id int," +
-                    "    City_Id     serial not null," +
-                    "    Courier_Id  int    not null," +
-                    "    FOREIGN KEY (Courier_Id) references staff (id)," +
-                    "    FOREIGN KEY (City_Id) references City (Id)," +
-                    "    FOREIGN KEY (Shipping_Id) references Shipping (Id)" +
-                    ");");
-            connection.createStatement().execute("create table Delivery" +
-
-                    "    (Id          serial primary key," +
-                    "    Shipping_Id int," +
-                    "    City_Id     int not null," +
-                    "    Courier_Id  int," +
-                    "    FOREIGN KEY (Courier_Id) references staff (id)," +
-                    "    FOREIGN KEY (City_Id) references City (Id)," +
-                    "    FOREIGN KEY (Shipping_Id) references Shipping (Id)" +
-                    ");");
-        }catch (SQLException e){
-            e.printStackTrace();
-        }finally {
-            if (connection!=null){
-                try {
-                    connection.close();
-                } catch (SQLException e) {
-                    e.printStackTrace();
-                }
+    private static final String CREATE_TABLES = """
+            create table Company
+            (
+                Id   serial primary key,
+                Name varchar(255) not null unique,
+                check (Name <>N'')
+            );
+            create table City
+            (
+                Id   serial primary key,
+                Name varchar(255) not null unique,
+                check (Name <>N'')
+            );
+            create table staff
+            (
+                Id serial primary key,
+                Name         varchar(255) not null,
+                Type       varchar(10)  not null,
+                Age         date         not null,
+                Company_Id int ,
+                City_id int,
+                Gender varchar(10),
+                Phone_Number numeric(11,0),
+                Password numeric(19,0),
+                FOREIGN KEY (Company_Id) references Company (Id),
+                FOREIGN KEY (City_id) references City (Id)
+            );
+            create table Item
+            (
+                Id    serial primary key,
+                Name  varchar(255)  not null unique,
+                Class varchar(255)  not null,
+                Price numeric(9, 0) not null,
+                check ( Price > 0 and Class <> N'' and Name <>N'')
+            );
+                        
+                        
+            create table Ship
+            (
+                Id      serial primary key,
+                Name    varchar(255) not null unique,
+                Company_Id int          not null,
+                FOREIGN KEY (Company_Id) references Company (Id)
+                        
+            );
+            create table Container
+            (
+                Id   serial primary key,
+                Code varchar(8)  not null unique,
+                Type varchar(100)
+            );
+                        
+            create table export
+            (
+                Id serial not null primary key,
+                City_Id serial not null ,
+                Tax numeric(15, 8),
+                Officer varchar(30),
+                FOREIGN KEY (City_Id) references City (Id)
+            );
+            create table import
+            (
+                Id serial not null primary key,
+                City_Id serial not null ,
+                Tax numeric(15, 8),
+                Officer varchar(30),
+                FOREIGN KEY (City_Id) references City (Id)
+            );
+                        
+            create table Shipping
+            (
+                Id               serial primary key,
+                Item_Id       int  not null,
+                Export_Id int  not null,
+                Import_Id int  not null,
+                Ship_Id             int,
+                Container_Id        int,
+                Item_State      varchar(50),
+                FOREIGN KEY (Export_Id) references export (Id),
+                FOREIGN KEY (Import_Id) references import (Id),
+                FOREIGN KEY (Item_Id) references item (Id),
+                FOREIGN KEY (Ship_Id) references Ship (Id),
+                FOREIGN KEY (Container_Id) references Container (Id)
+            );
+                        
+            create table Retrieval
+            (
+                Id               serial primary key,
+                Shipping_Id int ,
+                City_Id        serial not null,
+                Courier_Id     int    not null,
+                FOREIGN KEY (Courier_Id) references staff (id),
+                FOREIGN KEY (City_Id) references City (Id),
+                 FOREIGN KEY (Shipping_Id) references Shipping (Id)
+            );
+            create table Delivery
+            (
+                Id               serial primary key,
+                Shipping_Id int ,
+                City_Id         int not null,
+                Courier_Id      int,
+                FOREIGN KEY (Courier_Id) references staff (id),
+                FOREIGN KEY (City_Id) references City (Id),
+                 FOREIGN KEY (Shipping_Id) references Shipping (Id)
+            );
+            """;
+    private void createTables() {
+        try (Connection connection = source.getConnection()) {
+            try (PreparedStatement ps = connection.prepareStatement(CREATE_TABLES)) {
+                ps.executeQuery();
             }
+        } catch (SQLException sqlException) {
+            sqlException.printStackTrace();
         }
     }
 
-    private static final String CHECK_LOG = "SELECT Type FROM staffs WHERE Name = ? AND password = ? AND type = ?";
+    private static final String CHECK_LOG = "SELECT type FROM staffs WHERE name = ? AND password = ? AND type = ?";
     public boolean checkLog(@NotNull LogInfo log, @Nullable LogInfo.StaffType type){
         try (Connection connection = source.getConnection()) {
             try (PreparedStatement ps = connection.prepareStatement(CHECK_LOG)) {
@@ -204,37 +211,28 @@ public class DBManipulation implements IDatabaseManipulation{
         return false;
     }
 
+    public static final String INPUT_COMPANY = "insert into company(name) values(?)  ON CONFLICT DO NOTHING";
+    public static final String INPUT_CITY = "insert into city(name) values(?) ON CONFLICT DO NOTHING";
     @Override
     public void $import(String recordsCSV, String staffsCSV) {
-        String staffInfo[]= staffsCSV.split("\n");
-        String recordsInfo[] = recordsCSV.split("\n");
+        String[] staffInfo = staffsCSV.split("\n+");
+        String[] recordsInfo = recordsCSV.split("\n+");
 
-        String inputCompany = "insert into company(name) values(?)  ON CONFLICT DO NOTHING";
-        String inputCity = "insert into city(name) values(?) ON CONFLICT DO NOTHING";
-        Connection con = null;
-        try  {
-            con = source.getConnection();
-            PreparedStatement psCompany = con.prepareStatement(inputCompany);
-            PreparedStatement psCity = con.prepareStatement(inputCity);
-            for (int i = 1;i<recordsInfo.length;i++){
-                psCompany.setString(1, recordsInfo[i].split(",")[16]);
-                psCompany.executeUpdate();
-                psCity.setString(1,recordsInfo[i].split(",")[3]);
-                psCity.executeUpdate();
-                psCity.setString(1,recordsInfo[i].split(",")[7]);
-                psCity.executeUpdate();
-            }
-
-        } catch (SQLException sqlException) {
-            sqlException.printStackTrace();
-        }finally {
-            if (con!=null){
-                try {
-                    con.close();
-                } catch (SQLException e) {
-                    e.printStackTrace();
+        try (Connection connection = source.getConnection()) {
+            try (PreparedStatement psCompany = connection.prepareStatement(INPUT_COMPANY)) {
+                try (PreparedStatement psCity = connection.prepareStatement(INPUT_CITY)) {
+                    for (int i = 1; i < recordsInfo.length; i++) {
+                        psCompany.setString(1, recordsInfo[i].split(",\\s*")[16]);
+                        psCompany.executeUpdate();
+                        psCity.setString(1, recordsInfo[i].split(",\\s*")[3]);
+                        psCity.executeUpdate();
+                        psCity.setString(1, recordsInfo[i].split(",\\s*")[7]);
+                        psCity.executeUpdate();
+                    }
                 }
             }
+        } catch (SQLException sqlException) {
+            sqlException.printStackTrace();
         }
     }
 

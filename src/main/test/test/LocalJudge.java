@@ -1,11 +1,14 @@
+package test;
 
+import main.interfaces.*;
 import org.junit.jupiter.api.*;
-import answers.*;
+import test.answers.*;
 
 import java.io.*;
 import java.sql.*;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -15,14 +18,13 @@ public class LocalJudge {
 
     private static String root = "postgres";
 
-
     private static String pass = "mikimilo";
 
     private static String recordsCSV = "./data/records.csv";
 
     private static String staffsCSV = "./data/staffs.csv";
 
-    private static String manipulationImplClassName = "main.interfaces.DBManipulation";
+    private static String manipulationImplClassName = "main.DBManipulation";
 
     private static IDatabaseManipulation manipulation = null;
 

@@ -1,6 +1,6 @@
-package answers;
+package test.answers;
 
-import LogInfo;
+import main.interfaces.LogInfo;
 
 import java.io.Serializable;
 import java.util.HashMap;

@@ -1,6 +1,6 @@
 package test.answers;
 
-import NoMathExpectation.cs307.project2.interfaces.*;
+import main.interfaces.*;
 
 import java.io.Serializable;
 import java.util.HashMap;

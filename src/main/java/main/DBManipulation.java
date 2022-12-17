@@ -216,6 +216,7 @@ public class DBManipulation implements IDatabaseManipulation {
     public static final String INPUT_CITY = "insert into city(name) values(?) ON CONFLICT DO NOTHING";
     public static final String INPUT_STAFF = "insert into staffs(name,type,company_id,city_id,gender,age,phone_number,password) values(?,?,?,?,?,?,?,?)";
     public static final String INPUT_ITEM = "insert into item(name,class,price) values(?,?,?)";
+    public static final String INPUT_SHIP = "insert into ship(name,company_id) values(?,?) ON CONFLICT DO NOTHING";
     public static final String FIND_CITY_BY_NAME = "select id from city where name = ?";
     public static final String FIND_COMPANY_BY_NAME = "select id from company where name = ?";
     @Override
@@ -227,7 +228,9 @@ public class DBManipulation implements IDatabaseManipulation {
             PreparedStatement psCompany = connection.prepareStatement(INPUT_COMPANY);
             PreparedStatement psCity = connection.prepareStatement(INPUT_CITY);
             PreparedStatement psItem = connection.prepareStatement(INPUT_ITEM);
+            PreparedStatement psShip = connection.prepareStatement(INPUT_SHIP);
             for (int i = 1; i < recordsInfo.length; i++) {
+
                 psCompany.setString(1, recordsInfo[i].split(",\\s*")[16]);
                 psCompany.executeUpdate();
                 psCity.setString(1, recordsInfo[i].split(",\\s*")[3]);
@@ -238,6 +241,23 @@ public class DBManipulation implements IDatabaseManipulation {
                 psItem.setString(2,recordsInfo[i].split(",\\s*")[1]);
                 psItem.setInt(3, Integer.parseInt(recordsInfo[i].split(",\\s*")[2]));
                 psItem.executeUpdate();
+                psShip.setString(1,recordsInfo[i].split(",\\s*")[15]);
+                //find company by name
+                PreparedStatement psFindCompany= connection.prepareStatement(FIND_COMPANY_BY_NAME);
+                psFindCompany.setString(1,recordsInfo[i].split(",\\s*")[16]);
+
+                int company_id =0;
+                ResultSet companyRs= psFindCompany.executeQuery();
+
+                if (companyRs.next()){
+                    company_id = companyRs.getInt("id");
+                    psShip.setInt(2,company_id);
+                }else{
+                    psShip.setNull(2, Types.NULL);
+                }
+                if(recordsInfo[i].split(",\\s*")[15]!=""){
+                    psShip.executeUpdate();
+                }
             }
             PreparedStatement psStaff = connection.prepareStatement(INPUT_STAFF);
             for (int i = 1;i<staffInfo.length;i++){
@@ -266,8 +286,6 @@ public class DBManipulation implements IDatabaseManipulation {
                 //insert all values
                 psStaff.setString(1,staffInfo[i].split(",\\s*")[0]);
                 psStaff.setString(2,staffInfo[i].split(",\\s*")[1]);
-
-
                 psStaff.setString(5,staffInfo[i].split(",\\s*")[4]);
                 psStaff.setInt(6, Integer.parseInt(staffInfo[i].split(",\\s*")[5]));
                 psStaff.setString(7,staffInfo[i].split(",\\s*")[6]);

@@ -215,6 +215,7 @@ public class DBManipulation implements IDatabaseManipulation {
     public static final String INPUT_COMPANY = "insert into company(name) values(?)  ON CONFLICT DO NOTHING";
     public static final String INPUT_CITY = "insert into city(name) values(?) ON CONFLICT DO NOTHING";
     public static final String INPUT_STAFF = "insert into staffs(name,type,company_id,city_id,gender,age,phone_number,password) values(?,?,?,?,?,?,?,?)";
+    public static final String INPUT_ITEM = "insert into item(name,class,price) values(?,?,?)";
     public static final String FIND_CITY_BY_NAME = "select id from city where name = ?";
     public static final String FIND_COMPANY_BY_NAME = "select id from company where name = ?";
     @Override
@@ -225,6 +226,7 @@ public class DBManipulation implements IDatabaseManipulation {
         try (Connection connection = source.getConnection()) {
             PreparedStatement psCompany = connection.prepareStatement(INPUT_COMPANY);
             PreparedStatement psCity = connection.prepareStatement(INPUT_CITY);
+            PreparedStatement psItem = connection.prepareStatement(INPUT_ITEM);
             for (int i = 1; i < recordsInfo.length; i++) {
                 psCompany.setString(1, recordsInfo[i].split(",\\s*")[16]);
                 psCompany.executeUpdate();
@@ -232,6 +234,10 @@ public class DBManipulation implements IDatabaseManipulation {
                 psCity.executeUpdate();
                 psCity.setString(1, recordsInfo[i].split(",\\s*")[7]);
                 psCity.executeUpdate();
+                psItem.setString(1,recordsInfo[i].split(",\\s*")[0]);
+                psItem.setString(2,recordsInfo[i].split(",\\s*")[1]);
+                psItem.setInt(3, Integer.parseInt(recordsInfo[i].split(",\\s*")[2]));
+                psItem.executeUpdate();
             }
             PreparedStatement psStaff = connection.prepareStatement(INPUT_STAFF);
             for (int i = 1;i<staffInfo.length;i++){
@@ -306,7 +312,7 @@ public class DBManipulation implements IDatabaseManipulation {
         return getInt(GET_CITY_COUNT);
     }
 
-    private static final String GET_COURIER_COUNT = "SELECT count(*) FROM staff WHERE type = 'Courier'";
+    private static final String GET_COURIER_COUNT = "SELECT count(*) FROM staffs WHERE type = 'Courier'";
 
     @Override
     public int getCourierCount(@NotNull LogInfo log) {
@@ -348,8 +354,8 @@ public class DBManipulation implements IDatabaseManipulation {
                      join delivery del on shipping.id = del.shipping_id
                      join city delcity on delcity.id = del.city_id
                      join city retcity on retcity.id = ret.city_id
-                     join staff retcourier on ret.courier_id = retcourier.id
-                     join staff delcourier on del.courier_id = delcourier.id
+                     join staffs retcourier on ret.courier_id = retcourier.id
+                     join staffs delcourier on del.courier_id = delcourier.id
                      join import i on shipping.import_id = i.id
                      join export o on shipping.export_id = o.id
                      join city icity on i.city_id = icity.id

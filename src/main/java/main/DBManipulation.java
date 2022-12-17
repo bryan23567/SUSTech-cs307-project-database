@@ -133,7 +133,7 @@ public class DBManipulation implements IDatabaseManipulation {
     private void createTables() {
         try (Connection connection = source.getConnection()) {
             try (PreparedStatement ps = connection.prepareStatement(CREATE_TABLES)) {
-                ps.executeQuery();
+                ps.executeUpdate();
             }
         } catch (SQLException sqlException) {
             sqlException.printStackTrace();

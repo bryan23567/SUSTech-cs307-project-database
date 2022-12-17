@@ -12,10 +12,21 @@ import java.io.Serializable;
 public record LogInfo(String name, StaffType type, String password) implements Serializable {
 
     public enum StaffType {
-        SustcManager,
-        CompanyManager,
-        Courier,
-        SeaportOfficer
+        SustcManager("SUSTC Department Manager"),
+        CompanyManager("Company Manager"),
+        Courier("Courier"),
+        SeaportOfficer("Seaport Officer");
+
+        private final String name;
+
+        StaffType(String name) {
+            this.name = name;
+        }
+
+        @Override
+        public String toString() {
+            return this.name;
+        }
     }
 
 }

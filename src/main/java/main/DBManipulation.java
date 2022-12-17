@@ -157,7 +157,9 @@ public class DBManipulation implements IDatabaseManipulation {
     private int getInt(@NotNull String sql) {
         try (Connection connection = source.getConnection()) {
             try (PreparedStatement ps = connection.prepareStatement(sql)) {
-                return ps.executeQuery().getInt(0);
+                ResultSet rs = ps.executeQuery();
+                rs.next();
+                return rs.getInt(1);
             }
         } catch (SQLException sqlException) {
             sqlException.printStackTrace();

@@ -1,20 +1,17 @@
-package test;
 
-import NoMathExpectation.cs307.project2.interfaces.*;
 import org.junit.jupiter.api.*;
-import test.answers.*;
+import answers.*;
 
 import java.io.*;
 import java.sql.*;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class LocalJudge {
 
-    private static String database = "localhost:5432/project1";
+    private static String database = "localhost:5432/project2";
 
     private static String root = "postgres";
 
@@ -73,7 +70,9 @@ public class LocalJudge {
 
         try {
             FileInputStream fis = new FileInputStream(answerDirectory + "SUSTCDepartmentManagerUserTest.ser");
+
             ObjectInputStream ois = new ObjectInputStream(fis);
+
             sustcDepartmentManagerUserTest = (SUSTCDepartmentManagerUserTest) ois.readObject();
             ois.close();
             fis.close();

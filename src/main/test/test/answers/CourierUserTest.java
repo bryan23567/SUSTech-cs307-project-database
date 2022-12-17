@@ -1,4 +1,4 @@
-package test.answers;
+package answers;
 
 import java.io.Serializable;
 import java.util.HashMap;

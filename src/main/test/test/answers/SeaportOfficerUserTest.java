@@ -1,6 +1,6 @@
-package test.answers;
+package answers;
 
-import NoMathExpectation.cs307.project2.interfaces.LogInfo;
+import LogInfo;
 
 import java.io.Serializable;
 import java.util.HashMap;

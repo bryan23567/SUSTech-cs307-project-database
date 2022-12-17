@@ -7,15 +7,12 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.sql.DataSource;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 
 public class DBManipulation implements IDatabaseManipulation {
     private final DataSource source;
 
-    public DBManipulation(@NotNull String database, @NotNull String root, @NotNull String pass){
+    public DBManipulation(@NotNull String database, @NotNull String root, @NotNull String pass) {
         HikariConfig config = new HikariConfig();
         config.setJdbcUrl("jdbc:postgresql://" + database);
         config.setUsername(root);
@@ -37,17 +34,17 @@ public class DBManipulation implements IDatabaseManipulation {
                 Name varchar(255) not null unique,
                 check (Name <>N'')
             );
-            create table staff
+            create table staffs
             (
                 Id serial primary key,
                 Name         varchar(255) not null,
-                Type       varchar(10)  not null,
-                Age         date         not null,
+                Type       varchar(30)  not null,
+                Age         int        not null,
                 Company_Id int ,
                 City_id int,
                 Gender varchar(10),
-                Phone_Number numeric(11,0),
-                Password numeric(19,0),
+                Phone_Number varchar(20),
+                Password varchar(20),
                 FOREIGN KEY (Company_Id) references Company (Id),
                 FOREIGN KEY (City_id) references City (Id)
             );
@@ -115,7 +112,7 @@ public class DBManipulation implements IDatabaseManipulation {
                 Shipping_Id int ,
                 City_Id        serial not null,
                 Courier_Id     int    not null,
-                FOREIGN KEY (Courier_Id) references staff (id),
+                FOREIGN KEY (Courier_Id) references staffs (id),
                 FOREIGN KEY (City_Id) references City (Id),
                  FOREIGN KEY (Shipping_Id) references Shipping (Id)
             );
@@ -125,11 +122,12 @@ public class DBManipulation implements IDatabaseManipulation {
                 Shipping_Id int ,
                 City_Id         int not null,
                 Courier_Id      int,
-                FOREIGN KEY (Courier_Id) references staff (id),
+                FOREIGN KEY (Courier_Id) references staffs (id),
                 FOREIGN KEY (City_Id) references City (Id),
                  FOREIGN KEY (Shipping_Id) references Shipping (Id)
             );
             """;
+
     private void createTables() {
         try (Connection connection = source.getConnection()) {
             try (PreparedStatement ps = connection.prepareStatement(CREATE_TABLES)) {
@@ -141,7 +139,8 @@ public class DBManipulation implements IDatabaseManipulation {
     }
 
     private static final String CHECK_LOG = "SELECT type FROM staffs WHERE name = ? AND password = ? AND type = ?";
-    public boolean checkLog(@NotNull LogInfo log, @Nullable LogInfo.StaffType type){
+
+    public boolean checkLog(@NotNull LogInfo log, @Nullable LogInfo.StaffType type) {
         try (Connection connection = source.getConnection()) {
             try (PreparedStatement ps = connection.prepareStatement(CHECK_LOG)) {
                 ps.setString(1, log.name());
@@ -158,7 +157,7 @@ public class DBManipulation implements IDatabaseManipulation {
     private int getInt(@NotNull String sql) {
         try (Connection connection = source.getConnection()) {
             try (PreparedStatement ps = connection.prepareStatement(sql)) {
-                return ps.executeQuery().getInt(1);
+                return ps.executeQuery().getInt(0);
             }
         } catch (SQLException sqlException) {
             sqlException.printStackTrace();
@@ -213,24 +212,61 @@ public class DBManipulation implements IDatabaseManipulation {
 
     public static final String INPUT_COMPANY = "insert into company(name) values(?)  ON CONFLICT DO NOTHING";
     public static final String INPUT_CITY = "insert into city(name) values(?) ON CONFLICT DO NOTHING";
+    public static final String INPUT_STAFF = "insert into staffs(name,type,company_id,city_id,gender,age,phone_number,password) values(?,?,?,?,?,?,?,?)";
+    public static final String FIND_CITY_BY_NAME = "select id from city where name = ?";
+    public static final String FIND_COMPANY_BY_NAME = "select id from company where name = ?";
     @Override
     public void $import(String recordsCSV, String staffsCSV) {
         String[] staffInfo = staffsCSV.split("\n+");
         String[] recordsInfo = recordsCSV.split("\n+");
 
         try (Connection connection = source.getConnection()) {
-            try (PreparedStatement psCompany = connection.prepareStatement(INPUT_COMPANY)) {
-                try (PreparedStatement psCity = connection.prepareStatement(INPUT_CITY)) {
-                    for (int i = 1; i < recordsInfo.length; i++) {
-                        psCompany.setString(1, recordsInfo[i].split(",\\s*")[16]);
-                        psCompany.executeUpdate();
-                        psCity.setString(1, recordsInfo[i].split(",\\s*")[3]);
-                        psCity.executeUpdate();
-                        psCity.setString(1, recordsInfo[i].split(",\\s*")[7]);
-                        psCity.executeUpdate();
-                    }
-                }
+            PreparedStatement psCompany = connection.prepareStatement(INPUT_COMPANY);
+            PreparedStatement psCity = connection.prepareStatement(INPUT_CITY);
+            for (int i = 1; i < recordsInfo.length; i++) {
+                psCompany.setString(1, recordsInfo[i].split(",\\s*")[16]);
+                psCompany.executeUpdate();
+                psCity.setString(1, recordsInfo[i].split(",\\s*")[3]);
+                psCity.executeUpdate();
+                psCity.setString(1, recordsInfo[i].split(",\\s*")[7]);
+                psCity.executeUpdate();
             }
+            PreparedStatement psStaff = connection.prepareStatement(INPUT_STAFF);
+            for (int i = 1;i<staffInfo.length;i++){
+                //find city by name
+                PreparedStatement psFindCity= connection.prepareStatement(FIND_CITY_BY_NAME);
+                psFindCity.setString(1,staffInfo[i].split(",\\s*")[3]);
+                int city_id;
+                ResultSet cityRs= psFindCity.executeQuery();
+                if (cityRs.next()){
+                    city_id = cityRs.getInt("id");
+                    psStaff.setInt(4,city_id);
+                }else{
+                    psStaff.setNull(4, Types.NULL);
+                }
+                //find company by name
+                PreparedStatement psFindCompany= connection.prepareStatement(FIND_COMPANY_BY_NAME);
+                psFindCompany.setString(1,staffInfo[i].split(",\\s*")[2]);
+                int company_id =0;
+                ResultSet companyRs= psFindCompany.executeQuery();
+                if (companyRs.next()){
+                    company_id = companyRs.getInt("id");
+                    psStaff.setInt(3,company_id);
+                }else{
+                    psStaff.setNull(3, Types.NULL);
+                }
+                //insert all values
+                psStaff.setString(1,staffInfo[i].split(",\\s*")[0]);
+                psStaff.setString(2,staffInfo[i].split(",\\s*")[1]);
+
+
+                psStaff.setString(5,staffInfo[i].split(",\\s*")[4]);
+                psStaff.setInt(6, Integer.parseInt(staffInfo[i].split(",\\s*")[5]));
+                psStaff.setString(7,staffInfo[i].split(",\\s*")[6]);
+                psStaff.setString(8,staffInfo[i].split(",\\s*")[7]);
+                psStaff.execute();
+            }
+
         } catch (SQLException sqlException) {
             sqlException.printStackTrace();
         }
@@ -247,16 +283,18 @@ public class DBManipulation implements IDatabaseManipulation {
     }
 
     private static final String GET_COMPANY_COUNT = "SELECT count(*) FROM company";
+
     @Override
     public int getCompanyCount(@NotNull LogInfo log) {
+
         if (!checkLog(log, LogInfo.StaffType.SustcManager)) {
             return -1;
         }
-
         return getInt(GET_COMPANY_COUNT);
     }
 
     private static final String GET_CITY_COUNT = "SELECT count(*) FROM city";
+
     @Override
     public int getCityCount(@NotNull LogInfo log) {
         if (!checkLog(log, LogInfo.StaffType.SustcManager)) {
@@ -267,6 +305,7 @@ public class DBManipulation implements IDatabaseManipulation {
     }
 
     private static final String GET_COURIER_COUNT = "SELECT count(*) FROM staff WHERE type = 'Courier'";
+
     @Override
     public int getCourierCount(@NotNull LogInfo log) {
         if (!checkLog(log, LogInfo.StaffType.SustcManager)) {
@@ -277,6 +316,7 @@ public class DBManipulation implements IDatabaseManipulation {
     }
 
     private static final String GET_SHIP_COUNT = "SELECT count(*) FROM ship";
+
     @Override
     public int getShipCount(@NotNull LogInfo log) {
         if (!checkLog(log, LogInfo.StaffType.SustcManager)) {
@@ -315,6 +355,7 @@ public class DBManipulation implements IDatabaseManipulation {
                      join item it on shipping.item_id = it.id
             where it.name = ?
             """;
+
     @Override
     public @Nullable ItemInfo getItemInfo(@NotNull LogInfo log, @NotNull String name) {
         if (!checkLog(log, LogInfo.StaffType.SustcManager)) {

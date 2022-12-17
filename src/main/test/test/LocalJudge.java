@@ -38,7 +38,7 @@ public class LocalJudge {
 
     private static SeaportOfficerUserTest seaportOfficerUserTest = null;
 
-    private static LogInfo logInfo = new LogInfo("Hua Hang", LogInfo.StaffType.SustcManager, "500622842781782190");
+    private static LogInfo logInfo = new LogInfo("Hua Hang", LogInfo.StaffType.SustcManager, "500622842781782000");
 
     @BeforeAll
     public static void clearDatabaseAndPrepareAnswer() {

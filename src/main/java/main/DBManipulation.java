@@ -137,7 +137,7 @@ public class DBManipulation implements IDatabaseManipulation {
         }
     }
 
-    private static final String CHECK_LOG = "SELECT type FROM staff WHERE name = ? AND password = ? AND type = ?";
+    private static final String CHECK_LOG = "SELECT type FROM staffs WHERE name = ? AND password = ? AND type = ?";
 
     public boolean checkLog(@NotNull LogInfo log, @Nullable LogInfo.StaffType type) {
         try (Connection connection = source.getConnection()) {

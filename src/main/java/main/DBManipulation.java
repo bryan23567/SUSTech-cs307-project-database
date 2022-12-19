@@ -8,6 +8,8 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.sql.DataSource;
 import java.sql.*;
+import java.util.HashMap;
+import java.util.Map;
 
 public class DBManipulation implements IDatabaseManipulation {
     private final DataSource source;
@@ -70,24 +72,27 @@ public class DBManipulation implements IDatabaseManipulation {
             (
                 Id   serial primary key,
                 Code varchar(8)  not null unique,
-                Type varchar(100)
+                Type varchar(100),
+                check (Code<>N'')
             );
                         
             create table export
             (
-                Id serial not null primary key,
-                City_Id serial not null ,
-                Tax numeric(15, 8),
-                Officer varchar(30),
-                FOREIGN KEY (City_Id) references City (Id)
+                Id  serial not null primary key,
+                City_Id    serial not null,
+                Tax        numeric(20, 8),
+                Officer_id int,
+                FOREIGN KEY (City_Id) references City (Id),
+                FOREIGN KEY (Officer_id) references staffs (Id)
             );
             create table import
             (
                 Id serial not null primary key,
                 City_Id serial not null ,
-                Tax numeric(15, 8),
-                Officer varchar(30),
-                FOREIGN KEY (City_Id) references City (Id)
+                Tax numeric(20, 8),
+                Officer_id int,
+                FOREIGN KEY (City_Id) references City (Id),
+                FOREIGN KEY (Officer_id) references staffs (Id)
             );
                         
             create table Shipping
@@ -127,6 +132,7 @@ public class DBManipulation implements IDatabaseManipulation {
                  FOREIGN KEY (Shipping_Id) references Shipping (Id)
             );
             """;
+
     private void createTables() {
         try (Connection connection = source.getConnection()) {
             try (PreparedStatement ps = connection.prepareStatement(CREATE_TABLES)) {
@@ -213,11 +219,15 @@ public class DBManipulation implements IDatabaseManipulation {
 
     public static final String INPUT_COMPANY = "insert into company(name) values(?)  ON CONFLICT DO NOTHING";
     public static final String INPUT_CITY = "insert into city(name) values(?) ON CONFLICT DO NOTHING";
-    public static final String INPUT_STAFF = "insert into staffs(name,type,company_id,city_id,gender,age,phone_number,password) values(?,?,?,?,?,?,?,?)";
+    public static final String INPUT_STAFF = "insert into staffs(name,type,company_id,city_id,gender,age,phone_number,password) values(?,?,(select id from company where name = ? ),(select id from city where name = ? ),?,?,?,?)";
     public static final String INPUT_ITEM = "insert into item(name,class,price) values(?,?,?)";
-    public static final String INPUT_SHIP = "insert into ship(name,company_id) values(?,?) ON CONFLICT DO NOTHING";
-    public static final String FIND_CITY_BY_NAME = "select id from city where name = ?";
-    public static final String FIND_COMPANY_BY_NAME = "select id from company where name = ?";
+    public static final String INPUT_RETRIEVAL = "insert into retrieval(shipping_id,city_id,courier_id) values(?,(select id from city where name = ?),(select id from staffs where name = ?))";
+    public static final String INPUT_DELIVERY = "insert into delivery(shipping_id,city_id,courier_id) values(?,(select id from city where name = ?),(select id from staffs where name = ?))";
+    public static final String INPUT_SHIP = "insert into ship(name,company_id) values(?,(select id from company where name = ? )) ON CONFLICT DO NOTHING";
+    public static final String INPUT_CONTAINER = "insert into container(Code,Type) values(?,?)ON CONFLICT DO NOTHING";
+    public static final String INPUT_EXPORT = "insert into export(city_id,tax,officer_id) values((select id from city where name = ? ),?,(select id from staffs where name = ? ) )";
+    public static final String INPUT_IMPORT = "insert into import(city_id,tax,officer_id) values((select id from city where name = ? ),?,(select id from staffs where name = ? ) )";
+    public static final String INPUT_SHIPPING = "insert into shipping(item_id,export_id,import_id,ship_id,container_id,item_state) values(?,?,?,(select id from ship where name = ?), (select id from container where code = ?),? )";
     @Override
     public void $import(String recordsCSV, String staffsCSV) {
         String[] staffInfo = staffsCSV.split("\n+");
@@ -228,69 +238,88 @@ public class DBManipulation implements IDatabaseManipulation {
             PreparedStatement psCity = connection.prepareStatement(INPUT_CITY);
             PreparedStatement psItem = connection.prepareStatement(INPUT_ITEM);
             PreparedStatement psShip = connection.prepareStatement(INPUT_SHIP);
+            PreparedStatement psContainer = connection.prepareStatement(INPUT_CONTAINER);
+            PreparedStatement psExport = connection.prepareStatement(INPUT_EXPORT);
+            PreparedStatement psImport = connection.prepareStatement(INPUT_IMPORT);
+            PreparedStatement psShipping= connection.prepareStatement(INPUT_SHIPPING);
+            PreparedStatement psRetrieval= connection.prepareStatement(INPUT_RETRIEVAL);
+            PreparedStatement psDelivery= connection.prepareStatement(INPUT_DELIVERY);
             for (int i = 1; i < recordsInfo.length; i++) {
-
+                //input company
                 psCompany.setString(1, recordsInfo[i].split(",\\s*")[16]);
                 psCompany.executeUpdate();
+                //input city
                 psCity.setString(1, recordsInfo[i].split(",\\s*")[3]);
                 psCity.executeUpdate();
                 psCity.setString(1, recordsInfo[i].split(",\\s*")[7]);
                 psCity.executeUpdate();
-                psItem.setString(1,recordsInfo[i].split(",\\s*")[0]);
-                psItem.setString(2,recordsInfo[i].split(",\\s*")[1]);
-                psItem.setInt(3, Integer.parseInt(recordsInfo[i].split(",\\s*")[2]));
-                psItem.executeUpdate();
-                psShip.setString(1,recordsInfo[i].split(",\\s*")[15]);
-                //find company by name
-                PreparedStatement psFindCompany= connection.prepareStatement(FIND_COMPANY_BY_NAME);
-                psFindCompany.setString(1,recordsInfo[i].split(",\\s*")[16]);
-
-                int company_id =0;
-                ResultSet companyRs= psFindCompany.executeQuery();
-
-                if (companyRs.next()){
-                    company_id = companyRs.getInt("id");
-                    psShip.setInt(2,company_id);
-                }else{
-                    psShip.setNull(2, Types.NULL);
-                }
-                if(recordsInfo[i].split(",\\s*")[15]!=""){
-                    psShip.executeUpdate();
-                }
             }
+            //input staff
             PreparedStatement psStaff = connection.prepareStatement(INPUT_STAFF);
-            for (int i = 1;i<staffInfo.length;i++){
-                //find city by name
-                PreparedStatement psFindCity= connection.prepareStatement(FIND_CITY_BY_NAME);
-                psFindCity.setString(1,staffInfo[i].split(",\\s*")[3]);
-                int city_id;
-                ResultSet cityRs= psFindCity.executeQuery();
-                if (cityRs.next()){
-                    city_id = cityRs.getInt("id");
-                    psStaff.setInt(4,city_id);
-                }else{
-                    psStaff.setNull(4, Types.NULL);
-                }
-                //find company by name
-                PreparedStatement psFindCompany= connection.prepareStatement(FIND_COMPANY_BY_NAME);
-                psFindCompany.setString(1,staffInfo[i].split(",\\s*")[2]);
-                int company_id =0;
-                ResultSet companyRs= psFindCompany.executeQuery();
-                if (companyRs.next()){
-                    company_id = companyRs.getInt("id");
-                    psStaff.setInt(3,company_id);
-                }else{
-                    psStaff.setNull(3, Types.NULL);
-                }
-                //insert all values
-                psStaff.setString(1,staffInfo[i].split(",\\s*")[0]);
-                psStaff.setString(2,staffInfo[i].split(",\\s*")[1]);
-                psStaff.setString(5,staffInfo[i].split(",\\s*")[4]);
+            for (int i = 1; i < staffInfo.length; i++) {
+
+                psStaff.setString(4, staffInfo[i].split(",\\s*")[3]);
+                psStaff.setString(3, staffInfo[i].split(",\\s*")[2]);
+                psStaff.setString(1, staffInfo[i].split(",\\s*")[0]);
+                psStaff.setString(2, staffInfo[i].split(",\\s*")[1]);
+                psStaff.setString(5, staffInfo[i].split(",\\s*")[4]);
                 psStaff.setInt(6, Integer.parseInt(staffInfo[i].split(",\\s*")[5]));
-                psStaff.setString(7,staffInfo[i].split(",\\s*")[6]);
-                psStaff.setString(8,staffInfo[i].split(",\\s*")[7]);
+                psStaff.setString(7, staffInfo[i].split(",\\s*")[6]);
+                psStaff.setString(8, staffInfo[i].split(",\\s*")[7]);
                 psStaff.execute();
             }
+            for (int i = 1; i < recordsInfo.length; i++) {
+
+                //input item
+                psItem.setString(1, recordsInfo[i].split(",\\s*")[0]);
+                psItem.setString(2, recordsInfo[i].split(",\\s*")[1]);
+                psItem.setInt(3, Integer.parseInt(recordsInfo[i].split(",\\s*")[2]));
+                psItem.executeUpdate();
+                //input ship
+                psShip.setString(2, recordsInfo[i].split(",\\s*")[16]);
+                if (recordsInfo[i].split(",\\s*")[15] != "") {
+                    psShip.setString(1, recordsInfo[i].split(",\\s*")[15]);
+                    psShip.executeUpdate();
+                }
+                //input container
+                psContainer.setString(1, recordsInfo[i].split(",\\s*")[13]);
+                psContainer.setString(2, recordsInfo[i].split(",\\s*")[14]);
+                if (recordsInfo[i].split(",\\s*")[13] != "") {
+                    psContainer.executeUpdate();
+                }
+                //input export
+                psExport.setString(1,recordsInfo[i].split(",\\s*")[7]);
+                psExport.setDouble(2, Double.parseDouble(recordsInfo[i].split(",\\s*")[9]));
+                psExport.setString(3,recordsInfo[i].split(",\\s*")[11]);
+               psExport.executeUpdate();
+                //input import
+                psImport.setString(1,recordsInfo[i].split(",\\s*")[8]);
+                psImport.setDouble(2, Double.parseDouble(recordsInfo[i].split(",\\s*")[10]));
+                psImport.setString(3,recordsInfo[i].split(",\\s*")[12]);
+                psImport.executeUpdate();
+
+            }
+            for (int i = 1; i < recordsInfo.length; i++) {
+                //input shipping
+                psShipping.setInt(1,i);
+                psShipping.setInt(2,i);
+                psShipping.setInt(3,i);
+                psShipping.setString(4,recordsInfo[i].split(",\\s*")[15]);
+                psShipping.setString(5,recordsInfo[i].split(",\\s*")[14]);
+                psShipping.setString(6,recordsInfo[i].split(",\\s*")[17]);
+                psShipping.executeUpdate();
+                //input retrieval
+                psRetrieval.setInt(1,i);
+                psRetrieval.setString(2,recordsInfo[i].split(",\\s*")[3]);
+                psRetrieval.setString(3,recordsInfo[i].split(",\\s*")[4]);
+                psRetrieval.executeUpdate();
+                //input Delivery
+                psDelivery.setInt(1,i);
+                psDelivery.setString(2,recordsInfo[i].split(",\\s*")[5]);
+                psDelivery.setString(3,recordsInfo[i].split(",\\s*")[6]);
+                psDelivery.executeUpdate();
+            }
+
 
         } catch (SQLException sqlException) {
             sqlException.printStackTrace();

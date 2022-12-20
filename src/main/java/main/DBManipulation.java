@@ -222,7 +222,7 @@ public class DBManipulation implements IDatabaseManipulation {
     public boolean loadItemToContainer(LogInfo log, String itemName, String containerCode) {
         return false;
     }
-    private static final String FIND_CONTAINER = "select * from container where code = ?";
+    private static final String FIND_ITEM = "select Name,Item_State from shipping inner join Item I on Shipping.Item_Id = I.Id where Container_Id = (select id from container where Code = ?);";
     @Override
     public boolean loadContainerToShip(LogInfo log, String shipName, String containerCode) {
         if (!checkLog(log, LogInfo.StaffType.SeaportOfficer)) {
@@ -235,15 +235,23 @@ public class DBManipulation implements IDatabaseManipulation {
             return false;
         }
 
-//        try (Connection connection = source.getConnection()) {
-//            try (PreparedStatement ps = connection.prepareStatement(FIND_SHIP)) {
-//
-//                return ps.executeUpdate() > 0;
-//            }
-//        } catch (SQLException sqlException) {
-//            sqlException.printStackTrace();
-//            return false;
-//        }
+        try (Connection connection = source.getConnection()) {
+            try (PreparedStatement ps = connection.prepareStatement(FIND_ITEM)) {
+                ps.setString(1,containerCode);
+                ResultSet rs =ps.executeQuery();
+//                if (rs.next()){
+//                    do {
+//                        if (rs.getString("item_state").matches(ItemState.PackingToContainer.name())){
+//                            if (getItemInfo(log,rs.getString("name")).retrieval().)
+//                        }
+//                    }
+//                }
+//                return false
+            }
+        } catch (SQLException sqlException) {
+            sqlException.printStackTrace();
+            return false;
+        }
         return true;
     }
 

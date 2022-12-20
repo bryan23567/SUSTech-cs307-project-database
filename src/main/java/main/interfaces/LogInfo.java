@@ -1,5 +1,7 @@
 package main.interfaces;
 
+import org.jetbrains.annotations.Nullable;
+
 import java.io.Serializable;
 
 /*
@@ -26,6 +28,15 @@ public record LogInfo(String name, StaffType type, String password) implements S
         @Override
         public String toString() {
             return this.name;
+        }
+
+        public static @Nullable StaffType of(@Nullable String s) {
+            for (StaffType staffType : values()) {
+                if (staffType.name.equals(s)) {
+                    return staffType;
+                }
+            }
+            return null;
         }
     }
 

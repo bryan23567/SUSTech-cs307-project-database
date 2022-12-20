@@ -7,9 +7,10 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.sql.DataSource;
-import java.sql.*;
-import java.util.HashMap;
-import java.util.Map;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 
 public class DBManipulation implements IDatabaseManipulation {
     private final DataSource source;
@@ -159,9 +160,13 @@ public class DBManipulation implements IDatabaseManipulation {
         }
     }
 
-    private int getInt(@NotNull String sql) {
+    private int getInt(@NotNull String sql, @Nullable Object... args) {
         try (Connection connection = source.getConnection()) {
             try (PreparedStatement ps = connection.prepareStatement(sql)) {
+                for (int i = 0; i < args.length; i++) {
+                    ps.setObject(i + 1, args[i]);
+                }
+
                 ResultSet rs = ps.executeQuery();
                 rs.next();
                 return rs.getInt(1);
@@ -169,6 +174,37 @@ public class DBManipulation implements IDatabaseManipulation {
         } catch (SQLException sqlException) {
             sqlException.printStackTrace();
             return -1;
+        }
+    }
+
+    private double getDouble(@NotNull String sql, @Nullable Object... args) {
+        try (Connection connection = source.getConnection()) {
+            try (PreparedStatement ps = connection.prepareStatement(sql)) {
+                for (int i = 0; i < args.length; i++) {
+                    ps.setObject(i + 1, args[i]);
+                }
+
+                ResultSet rs = ps.executeQuery();
+                rs.next();
+                return rs.getDouble(1);
+            }
+        } catch (SQLException sqlException) {
+            sqlException.printStackTrace();
+            return -1;
+        }
+    }
+
+    private boolean update(@NotNull String sql, @Nullable Object... args) {
+        try (Connection connection = source.getConnection()) {
+            try (PreparedStatement ps = connection.prepareStatement(sql)) {
+                for (int i = 0; i < args.length; i++) {
+                    ps.setObject(i + 1, args[i]);
+                }
+                return ps.executeUpdate() > 0;
+            }
+        } catch (SQLException sqlException) {
+            sqlException.printStackTrace();
+            return false;
         }
     }
 
@@ -278,14 +314,14 @@ public class DBManipulation implements IDatabaseManipulation {
                 psItem.executeUpdate();
                 //input ship
                 psShip.setString(2, recordsInfo[i].split(",\\s*")[16]);
-                if (recordsInfo[i].split(",\\s*")[15] != "") {
+                if (recordsInfo[i].split(",\\s*")[15].isBlank()) {
                     psShip.setString(1, recordsInfo[i].split(",\\s*")[15]);
                     psShip.executeUpdate();
                 }
                 //input container
                 psContainer.setString(1, recordsInfo[i].split(",\\s*")[13]);
                 psContainer.setString(2, recordsInfo[i].split(",\\s*")[14]);
-                if (recordsInfo[i].split(",\\s*")[13] != "") {
+                if (recordsInfo[i].split(",\\s*")[13].isBlank()) {
                     psContainer.executeUpdate();
                 }
                 //input export
@@ -332,9 +368,22 @@ public class DBManipulation implements IDatabaseManipulation {
         return new String[0];
     }
 
+    private static final String SET_ITEM_CHECK_STATE = """
+            update shipping
+            set item_state = case
+                                 when item_state = 'Export Checking' and ? then 'Packing to Container'
+                                 when item_state = 'Import Checking' and ? then 'From-Import Transporting'
+                                 else item_state || ' Fail' end
+            where (select name from item where id = shipping.item_id) = ?
+              and item_state in ('Export Checking', 'Import Checking');
+            """;
     @Override
-    public boolean setItemCheckState(LogInfo log, String itemName, boolean success) {
-        return false;
+    public boolean setItemCheckState(@NotNull LogInfo log, @NotNull String itemName, boolean success) {
+        if (!checkLog(log, LogInfo.StaffType.SeaportOfficer)) {
+            return false;
+        }
+
+        return update(SET_ITEM_CHECK_STATE, success, success, itemName);
     }
 
     private static final String GET_COMPANY_COUNT = "SELECT count(*) FROM company";
@@ -429,7 +478,7 @@ public class DBManipulation implements IDatabaseManipulation {
                         rs.getString("item_name"),
                         rs.getString("item_class"),
                         rs.getDouble("item_price"),
-                        ItemState.valueOf(rs.getString("item_state")),
+                        ItemState.of(rs.getString("item_state")),
                         new ItemInfo.RetrievalDeliveryInfo(
                                 rs.getString("retrival_city"),
                                 rs.getString("retrival_courier")

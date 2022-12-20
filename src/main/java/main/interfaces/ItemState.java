@@ -1,5 +1,7 @@
 package main.interfaces;
 
+import org.jetbrains.annotations.Nullable;
+
 /*
  * <p>
  * Corresponding to column ItemState given in record.csv
@@ -24,5 +26,14 @@ public enum ItemState {
 
     ItemState(String name) {
         this.name = name;
+    }
+
+    public static @Nullable ItemState of(@Nullable String s) {
+    for (ItemState itemState : values()) {
+            if (itemState.name.equals(s)) {
+                return itemState;
+            }
+        }
+        return null;
     }
 }

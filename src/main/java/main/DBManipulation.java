@@ -7,10 +7,13 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.sql.DataSource;
+import java.lang.reflect.Array;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class DBManipulation implements IDatabaseManipulation {
     private final DataSource source;
@@ -21,7 +24,7 @@ public class DBManipulation implements IDatabaseManipulation {
         config.setUsername(root);
         config.setPassword(pass);
         source = new HikariDataSource(config);
-        createTables();
+        createTablesAndFunctions();
     }
 
     private static final String CREATE_TABLES = """
@@ -132,9 +135,63 @@ public class DBManipulation implements IDatabaseManipulation {
                 FOREIGN KEY (City_Id) references City (Id),
                  FOREIGN KEY (Shipping_Id) references Shipping (Id)
             );
+                        
+            create or replace function check_item(item_name varchar(255), officer varchar(255), success boolean) returns bool as
+            $$
+            declare
+                officer_id0 int := (select id
+                                    from staffs
+                                    where name = officer);
+                ioid        int;
+                item_row    record;
+                is_import   boolean;
+            begin
+                select item_id, item_state, export_id, import_id
+                into item_row
+                from shipping
+                         join item i on i.id = shipping.item_id
+                where i.name = item_name;
+                        
+                case (item_row.item_state)
+                    when 'Export Checking' then is_import := false;
+                                                ioid := item_row.export_id;
+                                                if (success) then
+                                                    update shipping
+                                                    set item_state = 'Packing to Container'
+                                                    where item_id = item_row.item_id;
+                                                else
+                                                    update shipping
+                                                    set item_state = 'Export Checking Fail'
+                                                    where item_id = item_row.item_id;
+                                                end if;
+                    when 'Import Checking' then is_import := true;
+                                                ioid := item_row.import_id;
+                                                if (success) then
+                                                    update shipping
+                                                    set item_state = 'From-Import Transporting'
+                                                    where item_id = item_row.item_id;
+                                                else
+                                                    update shipping
+                                                    set item_state = 'Import Checking Fail'
+                                                    where item_id = item_row.item_id;
+                                                end if;
+                    else return false;
+                    end case;
+                        
+                if (is_import) then
+                    update import set officer_id = officer_id0 where id = ioid;
+                else
+                    update export set officer_id = officer_id0 where id = ioid;
+                end if;
+                        
+                return true;
+            exception
+                when others then return false;
+            end;
+            $$ language plpgsql;
             """;
 
-    private void createTables() {
+    private void createTablesAndFunctions() {
         try (Connection connection = source.getConnection()) {
             try (PreparedStatement ps = connection.prepareStatement(CREATE_TABLES)) {
                 ps.executeUpdate();
@@ -157,6 +214,29 @@ public class DBManipulation implements IDatabaseManipulation {
         } catch (SQLException sqlException) {
             sqlException.printStackTrace();
             return false;
+        }
+    }
+
+    @SuppressWarnings("unchecked cast")
+    public <T> T[] get(@NotNull String sql, @NotNull Class<T> clazz, @Nullable Object... args) {
+        try (Connection connection = source.getConnection()) {
+            try (PreparedStatement ps = connection.prepareStatement(sql)) {
+                if (args != null) {
+                    for (int i = 0; i < args.length; i++) {
+                        ps.setObject(i + 1, args[i]);
+                    }
+                }
+                try (ResultSet rs = ps.executeQuery()) {
+                    List<T> list = new ArrayList<>();
+                    while (rs.next()) {
+                        list.add((T) rs.getObject(1));
+                    }
+                    return list.toArray((T[]) Array.newInstance(clazz, list.size()));
+                }
+            }
+        } catch (SQLException | ClassCastException exception) {
+            exception.printStackTrace();
+            return null;
         }
     }
 
@@ -191,6 +271,23 @@ public class DBManipulation implements IDatabaseManipulation {
         } catch (SQLException sqlException) {
             sqlException.printStackTrace();
             return -1;
+        }
+    }
+
+    private boolean getBoolean(@NotNull String sql, @Nullable Object... args) {
+        try (Connection connection = source.getConnection()) {
+            try (PreparedStatement ps = connection.prepareStatement(sql)) {
+                for (int i = 0; i < args.length; i++) {
+                    ps.setObject(i + 1, args[i]);
+                }
+
+                ResultSet rs = ps.executeQuery();
+                rs.next();
+                return rs.getBoolean(1);
+            }
+        } catch (SQLException sqlException) {
+            sqlException.printStackTrace();
+            return false;
         }
     }
 
@@ -390,27 +487,33 @@ public class DBManipulation implements IDatabaseManipulation {
         }
     }
 
+    private static final String GET_ALL_ITEMS_AT_PORT = """
+            with officer_city_id as (select city_id from staffs where name = ?)
+            select it.name
+            from shipping
+                     join item it on it.id = shipping.item_id
+                     join import im on im.id = shipping.import_id
+                     join export ex on ex.id = shipping.export_id
+            where (im.city_id in (select * from officer_city_id) and item_state = 'Import Checking')
+               or (ex.city_id in (select * from officer_city_id) and item_state = 'Export Checking');
+            """;
     @Override
-    public String[] getAllItemsAtPort(LogInfo log) {
-        return new String[0];
+    public @Nullable String[] getAllItemsAtPort(@NotNull LogInfo log) {
+        if (!checkLog(log, LogInfo.StaffType.SeaportOfficer)) {
+            return null;
+        }
+
+        return get(GET_ALL_ITEMS_AT_PORT, String.class, log.name());
     }
 
-    private static final String SET_ITEM_CHECK_STATE = """
-            update shipping
-            set item_state = case
-                                 when item_state = 'Export Checking' and ? then 'Packing to Container'
-                                 when item_state = 'Import Checking' and ? then 'From-Import Transporting'
-                                 else item_state || ' Fail' end
-            where (select name from item where id = shipping.item_id) = ?
-              and item_state in ('Export Checking', 'Import Checking');
-            """;
+    private static final String SET_ITEM_CHECK_STATE = "select check_item(?, ?, ?);";
     @Override
     public boolean setItemCheckState(@NotNull LogInfo log, @NotNull String itemName, boolean success) {
         if (!checkLog(log, LogInfo.StaffType.SeaportOfficer)) {
             return false;
         }
 
-        return update(SET_ITEM_CHECK_STATE, success, success, itemName);
+        return getBoolean(SET_ITEM_CHECK_STATE, itemName, log.name(), success);
     }
 
     private static final String GET_COMPANY_COUNT = "SELECT count(*) FROM company";
@@ -464,8 +567,8 @@ public class DBManipulation implements IDatabaseManipulation {
                    delcourier.name     as delivery_courier,
                    icity.name          as import_city,
                    ocity.name          as export_city,
-                   i.officer           as import_officer,
-                   o.officer           as export_officer,
+                   iofficer.name       as import_officer,
+                   oofficer.name       as export_officer,
                    i.tax               as import_tax,
                    o.tax               as export_tax,
                    it.name             as item_name,
@@ -481,10 +584,12 @@ public class DBManipulation implements IDatabaseManipulation {
                      join staffs delcourier on del.courier_id = delcourier.id
                      join import i on shipping.import_id = i.id
                      join export o on shipping.export_id = o.id
+                     join staffs iofficer on i.officer_id = iofficer.id
+                     join staffs oofficer on o.officer_id = oofficer.id
                      join city icity on i.city_id = icity.id
                      join city ocity on o.city_id = ocity.id
                      join item it on shipping.item_id = it.id
-            where it.name = ?
+            where it.name = ?;
             """;
 
     @Override

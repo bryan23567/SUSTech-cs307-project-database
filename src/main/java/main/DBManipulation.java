@@ -222,10 +222,29 @@ public class DBManipulation implements IDatabaseManipulation {
     public boolean loadItemToContainer(LogInfo log, String itemName, String containerCode) {
         return false;
     }
-
+    private static final String FIND_CONTAINER = "select * from container where code = ?";
     @Override
     public boolean loadContainerToShip(LogInfo log, String shipName, String containerCode) {
-        return false;
+        if (!checkLog(log, LogInfo.StaffType.SeaportOfficer)) {
+            return false;
+        }
+        if (getShipInfo(log,shipName).sailing()){
+            return false;
+        }
+        if (!getShipInfo(log,shipName).owner().matches(getStaffInfo(log, log.name()).company())){
+            return false;
+        }
+
+//        try (Connection connection = source.getConnection()) {
+//            try (PreparedStatement ps = connection.prepareStatement(FIND_SHIP)) {
+//
+//                return ps.executeUpdate() > 0;
+//            }
+//        } catch (SQLException sqlException) {
+//            sqlException.printStackTrace();
+//            return false;
+//        }
+        return true;
     }
 
     @Override
@@ -342,7 +361,7 @@ public class DBManipulation implements IDatabaseManipulation {
                 psShipping.setInt(2, i);
                 psShipping.setInt(3, i);
                 psShipping.setString(4, recordsInfo[i].split(",\\s*")[15]);
-                psShipping.setString(5, recordsInfo[i].split(",\\s*")[14]);
+                psShipping.setString(5, recordsInfo[i].split(",\\s*")[13]);
                 psShipping.setString(6, recordsInfo[i].split(",\\s*")[17]);
                 psShipping.executeUpdate();
                 //input retrieval

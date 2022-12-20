@@ -228,6 +228,7 @@ public class DBManipulation implements IDatabaseManipulation {
     public static final String INPUT_EXPORT = "insert into export(city_id,tax,officer_id) values((select id from city where name = ? ),?,(select id from staffs where name = ? ) )";
     public static final String INPUT_IMPORT = "insert into import(city_id,tax,officer_id) values((select id from city where name = ? ),?,(select id from staffs where name = ? ) )";
     public static final String INPUT_SHIPPING = "insert into shipping(item_id,export_id,import_id,ship_id,container_id,item_state) values(?,?,?,(select id from ship where name = ?), (select id from container where code = ?),? )";
+
     @Override
     public void $import(String recordsCSV, String staffsCSV) {
         String[] staffInfo = staffsCSV.split("\n+");
@@ -241,9 +242,9 @@ public class DBManipulation implements IDatabaseManipulation {
             PreparedStatement psContainer = connection.prepareStatement(INPUT_CONTAINER);
             PreparedStatement psExport = connection.prepareStatement(INPUT_EXPORT);
             PreparedStatement psImport = connection.prepareStatement(INPUT_IMPORT);
-            PreparedStatement psShipping= connection.prepareStatement(INPUT_SHIPPING);
-            PreparedStatement psRetrieval= connection.prepareStatement(INPUT_RETRIEVAL);
-            PreparedStatement psDelivery= connection.prepareStatement(INPUT_DELIVERY);
+            PreparedStatement psShipping = connection.prepareStatement(INPUT_SHIPPING);
+            PreparedStatement psRetrieval = connection.prepareStatement(INPUT_RETRIEVAL);
+            PreparedStatement psDelivery = connection.prepareStatement(INPUT_DELIVERY);
             for (int i = 1; i < recordsInfo.length; i++) {
                 //input company
                 psCompany.setString(1, recordsInfo[i].split(",\\s*")[16]);
@@ -288,35 +289,35 @@ public class DBManipulation implements IDatabaseManipulation {
                     psContainer.executeUpdate();
                 }
                 //input export
-                psExport.setString(1,recordsInfo[i].split(",\\s*")[7]);
+                psExport.setString(1, recordsInfo[i].split(",\\s*")[7]);
                 psExport.setDouble(2, Double.parseDouble(recordsInfo[i].split(",\\s*")[9]));
-                psExport.setString(3,recordsInfo[i].split(",\\s*")[11]);
-               psExport.executeUpdate();
+                psExport.setString(3, recordsInfo[i].split(",\\s*")[11]);
+                psExport.executeUpdate();
                 //input import
-                psImport.setString(1,recordsInfo[i].split(",\\s*")[8]);
+                psImport.setString(1, recordsInfo[i].split(",\\s*")[8]);
                 psImport.setDouble(2, Double.parseDouble(recordsInfo[i].split(",\\s*")[10]));
-                psImport.setString(3,recordsInfo[i].split(",\\s*")[12]);
+                psImport.setString(3, recordsInfo[i].split(",\\s*")[12]);
                 psImport.executeUpdate();
 
             }
             for (int i = 1; i < recordsInfo.length; i++) {
                 //input shipping
-                psShipping.setInt(1,i);
-                psShipping.setInt(2,i);
-                psShipping.setInt(3,i);
-                psShipping.setString(4,recordsInfo[i].split(",\\s*")[15]);
-                psShipping.setString(5,recordsInfo[i].split(",\\s*")[14]);
-                psShipping.setString(6,recordsInfo[i].split(",\\s*")[17]);
+                psShipping.setInt(1, i);
+                psShipping.setInt(2, i);
+                psShipping.setInt(3, i);
+                psShipping.setString(4, recordsInfo[i].split(",\\s*")[15]);
+                psShipping.setString(5, recordsInfo[i].split(",\\s*")[14]);
+                psShipping.setString(6, recordsInfo[i].split(",\\s*")[17]);
                 psShipping.executeUpdate();
                 //input retrieval
-                psRetrieval.setInt(1,i);
-                psRetrieval.setString(2,recordsInfo[i].split(",\\s*")[3]);
-                psRetrieval.setString(3,recordsInfo[i].split(",\\s*")[4]);
+                psRetrieval.setInt(1, i);
+                psRetrieval.setString(2, recordsInfo[i].split(",\\s*")[3]);
+                psRetrieval.setString(3, recordsInfo[i].split(",\\s*")[4]);
                 psRetrieval.executeUpdate();
                 //input Delivery
-                psDelivery.setInt(1,i);
-                psDelivery.setString(2,recordsInfo[i].split(",\\s*")[5]);
-                psDelivery.setString(3,recordsInfo[i].split(",\\s*")[6]);
+                psDelivery.setInt(1, i);
+                psDelivery.setString(2, recordsInfo[i].split(",\\s*")[5]);
+                psDelivery.setString(3, recordsInfo[i].split(",\\s*")[6]);
                 psDelivery.executeUpdate();
             }
 
@@ -455,9 +456,41 @@ public class DBManipulation implements IDatabaseManipulation {
         }
     }
 
+    private static final String GET_SHIP_INFO = """
+            select sName as name, cName as owner, Item_State
+            from shipping
+                     inner join (select Ship.Name as sName, ship.Id as sId, Company.Name as cName
+                                 from ship
+                                          inner join company on Ship.Company_Id = Company.Id
+                                 where Ship.Name = ?) as foo on foo.sId = Shipping.Ship_Id;
+            """;
+
     @Override
     public ShipInfo getShipInfo(LogInfo log, String name) {
-        return null;
+        if (!checkLog(log, LogInfo.StaffType.SustcManager)) {
+            return null;
+        }
+        try (Connection connection = source.getConnection()) {
+            try (PreparedStatement ps = connection.prepareStatement(GET_SHIP_INFO)) {
+                ps.setString(1, name);
+                ResultSet rs = ps.executeQuery();
+                if (rs.next()) {
+                    String sName = rs.getString("name");
+                    String sCompany = rs.getString("owner");
+                    do {
+                        if (rs.getString("item_state").matches(ItemState.Shipping.name())){
+                            return new ShipInfo(sName, sCompany, true);
+                        }
+                    }while (rs.next());
+                    return new ShipInfo(sName, sCompany, false);
+
+                }
+                return null;
+            }
+        } catch (SQLException sqlException) {
+            sqlException.printStackTrace();
+            return null;
+        }
     }
 
     @Override

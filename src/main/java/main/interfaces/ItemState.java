@@ -5,19 +5,24 @@ package main.interfaces;
  * Corresponding to column ItemState given in record.csv
  * <p>
  * @classname: ItemState
-*/
+ */
 public enum ItemState {
-	PickingUp,
-	ToExportTransporting,
-	ExportChecking,
-	ExportCheckFailed,
-	PackingToContainer,
-	WaitingForShipping,
-	Shipping,
-	UnpackingFromContainer,
-	ImportChecking,
-	ImportCheckFailed,
-	FromImportTransporting,
-	Delivering,
-	Finish
+    PickingUp("Picking-up"),
+    ToExportTransporting("To-Export Transporting"),
+    ExportChecking("Export Checking"),
+    ExportCheckFailed("Export Check Fail"),
+    PackingToContainer("Packing to Container"),
+    WaitingForShipping("Waiting for Shipping"),
+    Shipping("Shipping"),
+    UnpackingFromContainer("Unpacking from Container"),
+    ImportChecking("Import Checking"),
+    ImportCheckFailed("Import Check Fail"),
+    FromImportTransporting("From-Import Transporting"),
+    Delivering("Delivering"),
+    Finish("Finish");
+    private final String name;
+
+    ItemState(String name) {
+        this.name = name;
+    }
 }

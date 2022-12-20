@@ -2,7 +2,10 @@ package test;
 
 import main.interfaces.*;
 import org.junit.jupiter.api.*;
-import test.answers.*;
+import test.answers.CompanyManagerUserTest;
+import test.answers.CourierUserTest;
+import test.answers.SUSTCDepartmentManagerUserTest;
+import test.answers.SeaportOfficerUserTest;
 
 import java.io.*;
 import java.sql.*;
@@ -38,14 +41,14 @@ public class LocalJudge {
 
     private static SeaportOfficerUserTest seaportOfficerUserTest = null;
 
-    private static LogInfo logInfo = new LogInfo("Hua Hang", LogInfo.StaffType.SustcManager, "500622842781782000");
+    private static LogInfo logInfo = new LogInfo("Hua Hang", LogInfo.StaffType.SustcManager, "500622842781782190");
 
     @BeforeAll
     public static void clearDatabaseAndPrepareAnswer() {
         try {
             Class.forName("org.postgresql.Driver");
         } catch (Exception e) {
-            System.err.println(e);
+            System.err.println("Cannot find the Postgres driver. Check CLASSPATH.");
             System.exit(1);
         }
         String url = "jdbc:postgresql://" + database;
@@ -72,9 +75,7 @@ public class LocalJudge {
 
         try {
             FileInputStream fis = new FileInputStream(answerDirectory + "SUSTCDepartmentManagerUserTest.ser");
-
             ObjectInputStream ois = new ObjectInputStream(fis);
-
             sustcDepartmentManagerUserTest = (SUSTCDepartmentManagerUserTest) ois.readObject();
             ois.close();
             fis.close();
@@ -189,7 +190,7 @@ public class LocalJudge {
         Set<Map.Entry<List<Object>, ItemInfo>> entries = sustcDepartmentManagerUserTest.getItemInfo.entrySet();
         for (Map.Entry<List<Object>, ItemInfo> entry : entries) {
             List<Object> params = entry.getKey();
-            assertEquals(entry.getValue(), manipulation.getItemInfo((LogInfo) params.get(0), (String) params.get(1)));
+            assertItemInfo(entry.getValue(), manipulation.getItemInfo((LogInfo) params.get(0), (String) params.get(1)));
         }
     }
 
@@ -246,7 +247,7 @@ public class LocalJudge {
      */
     @Test
     @Order(11)
-    @Timeout(value = 2000, unit = TimeUnit.MILLISECONDS)
+    @Timeout(value = 3000, unit = TimeUnit.MILLISECONDS)
     public void newItem() {
         Set<Map.Entry<List<Object>, Boolean>> entries = courierUserTest.newItem.entrySet();
         Set<Map.Entry<List<Object>, Boolean>> treeSet = new TreeSet<>((o1, o2) -> {
@@ -279,7 +280,7 @@ public class LocalJudge {
             assertEquals(entry.getValue(), manipulation.setItemState((LogInfo) params.get(0), (String) params.get(1), (ItemState) params.get(2)));
         }
 
-        ItemInfo itemInfo = manipulation.getItemInfo(logInfo, "peach-778ca");
+        ItemInfo itemInfo = manipulation.getItemInfo(logInfo, "newItem1");
         assertEquals(ItemState.ToExportTransporting, itemInfo.state());
     }
 
@@ -290,7 +291,7 @@ public class LocalJudge {
         Set<Map.Entry<List<Object>, Double>> entries = companyManagerUserTest.getImportTaxRate.entrySet();
         for (Map.Entry<List<Object>, Double> entry : entries) {
             List<Object> params = entry.getKey();
-            assertEquals(entry.getValue(), manipulation.getImportTaxRate((LogInfo) params.get(0), (String) params.get(1), (String) params.get(2)));
+            assertEquals(entry.getValue(), manipulation.getImportTaxRate((LogInfo) params.get(0), (String) params.get(1), (String) params.get(2)), 0.01);
         }
     }
 
@@ -301,7 +302,7 @@ public class LocalJudge {
         Set<Map.Entry<List<Object>, Double>> entries = companyManagerUserTest.getExportTaxRate.entrySet();
         for (Map.Entry<List<Object>, Double> entry : entries) {
             List<Object> params = entry.getKey();
-            assertEquals(entry.getValue(), manipulation.getExportTaxRate((LogInfo) params.get(0), (String) params.get(1), (String) params.get(2)));
+            assertEquals(entry.getValue(), manipulation.getExportTaxRate((LogInfo) params.get(0), (String) params.get(1), (String) params.get(2)), 0.01);
         }
     }
 
@@ -444,5 +445,25 @@ public class LocalJudge {
             sb.append("\n");
         });
         return sb.toString();
+    }
+
+    public void assertItemInfo(ItemInfo a, ItemInfo b) {
+        if (a == null && b == null) return;
+        if ((a != null && b == null) || (a == null && b != null)) fail();
+        double EPS = 0.0001;
+        assertEquals(a.name(), b.name());
+        assertEquals(a.$class(), b.$class());
+        assertTrue(Math.abs(a.price() - b.price()) / a.price() < EPS);
+        assertEquals(a.state(), b.state());
+        assertEquals(a.retrieval().city(), b.retrieval().city());
+        assertEquals(a.retrieval().courier(), b.retrieval().courier());
+        assertEquals(a.delivery().city(), b.delivery().city());
+        assertEquals(a.delivery().courier(), b.delivery().courier());
+        assertEquals(a.$import().city(), b.$import().city());
+        assertEquals(a.$import().officer(), b.$import().officer());
+        assertTrue(Math.abs(a.$import().tax() - b.$import().tax()) / a.$import().tax() < EPS);
+        assertEquals(a.export().city(), b.export().city());
+        assertEquals(a.export().officer(), b.export().officer());
+        assertTrue(Math.abs(a.export().tax() - b.export().tax()) / a.export().tax() < EPS);
     }
 }

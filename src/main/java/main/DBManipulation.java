@@ -314,14 +314,14 @@ public class DBManipulation implements IDatabaseManipulation {
                 psItem.executeUpdate();
                 //input ship
                 psShip.setString(2, recordsInfo[i].split(",\\s*")[16]);
-                if (recordsInfo[i].split(",\\s*")[15].isBlank()) {
+                if (!recordsInfo[i].split(",\\s*")[15].isBlank()) {
                     psShip.setString(1, recordsInfo[i].split(",\\s*")[15]);
                     psShip.executeUpdate();
                 }
                 //input container
                 psContainer.setString(1, recordsInfo[i].split(",\\s*")[13]);
                 psContainer.setString(2, recordsInfo[i].split(",\\s*")[14]);
-                if (recordsInfo[i].split(",\\s*")[13].isBlank()) {
+                if (!recordsInfo[i].split(",\\s*")[13].isBlank()) {
                     psContainer.executeUpdate();
                 }
                 //input export

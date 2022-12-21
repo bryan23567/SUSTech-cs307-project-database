@@ -475,15 +475,15 @@ public class DBManipulation implements IDatabaseManipulation {
             PreparedStatement psShipping = connection.prepareStatement(INPUT_SHIPPING);
             PreparedStatement psRetrieval = connection.prepareStatement(INPUT_RETRIEVAL);
             PreparedStatement psDelivery = connection.prepareStatement(INPUT_DELIVERY);
-            for (int i = 1; i < recordsInfo.length; i++) {
+            for (int i = 1; i < 86; i++) {
                 //input company
                 psCompany.setString(1, recordsInfo[i].split(",\\s*")[16]);
-                psCompany.executeUpdate();
+                psCompany.addBatch();
                 //input city
                 psCity.setString(1, recordsInfo[i].split(",\\s*")[3]);
-                psCity.executeUpdate();
+                psCity.addBatch();
                 psCity.setString(1, recordsInfo[i].split(",\\s*")[7]);
-                psCity.executeUpdate();
+                psCity.addBatch();
             }
             //input staff
             PreparedStatement psStaff = connection.prepareStatement(INPUT_STAFF);
@@ -497,7 +497,21 @@ public class DBManipulation implements IDatabaseManipulation {
                 psStaff.setInt(6, Integer.parseInt(staffInfo[i].split(",\\s*")[5]));
                 psStaff.setString(7, staffInfo[i].split(",\\s*")[6]);
                 psStaff.setString(8, staffInfo[i].split(",\\s*")[7]);
-                psStaff.execute();
+                psStaff.addBatch();
+            }
+            for (int i = 1; i < recordsInfo.length; i++) {
+                //input ship
+                psShip.setString(2, recordsInfo[i].split(",\\s*")[16]);
+                if (!recordsInfo[i].split(",\\s*")[15].isBlank()) {
+                    psShip.setString(1, recordsInfo[i].split(",\\s*")[15]);
+                    psShip.addBatch();
+                }
+                //input container
+                psContainer.setString(1, recordsInfo[i].split(",\\s*")[13]);
+                psContainer.setString(2, recordsInfo[i].split(",\\s*")[14]);
+                if (!recordsInfo[i].split(",\\s*")[13].isBlank()) {
+                    psContainer.addBatch();
+                }
             }
             for (int i = 1; i < recordsInfo.length; i++) {
 
@@ -505,29 +519,18 @@ public class DBManipulation implements IDatabaseManipulation {
                 psItem.setString(1, recordsInfo[i].split(",\\s*")[0]);
                 psItem.setString(2, recordsInfo[i].split(",\\s*")[1]);
                 psItem.setInt(3, Integer.parseInt(recordsInfo[i].split(",\\s*")[2]));
-                psItem.executeUpdate();
-                //input ship
-                psShip.setString(2, recordsInfo[i].split(",\\s*")[16]);
-                if (!recordsInfo[i].split(",\\s*")[15].isBlank()) {
-                    psShip.setString(1, recordsInfo[i].split(",\\s*")[15]);
-                    psShip.executeUpdate();
-                }
-                //input container
-                psContainer.setString(1, recordsInfo[i].split(",\\s*")[13]);
-                psContainer.setString(2, recordsInfo[i].split(",\\s*")[14]);
-                if (!recordsInfo[i].split(",\\s*")[13].isBlank()) {
-                    psContainer.executeUpdate();
-                }
+                psItem.addBatch();
+
                 //input export
                 psExport.setString(1, recordsInfo[i].split(",\\s*")[7]);
                 psExport.setDouble(2, Double.parseDouble(recordsInfo[i].split(",\\s*")[9]));
                 psExport.setString(3, recordsInfo[i].split(",\\s*")[11]);
-                psExport.executeUpdate();
+                psExport.addBatch();
                 //input import
                 psImport.setString(1, recordsInfo[i].split(",\\s*")[8]);
                 psImport.setDouble(2, Double.parseDouble(recordsInfo[i].split(",\\s*")[10]));
                 psImport.setString(3, recordsInfo[i].split(",\\s*")[12]);
-                psImport.executeUpdate();
+                psImport.addBatch();
 
             }
             for (int i = 1; i < recordsInfo.length; i++) {
@@ -538,20 +541,29 @@ public class DBManipulation implements IDatabaseManipulation {
                 psShipping.setString(4, recordsInfo[i].split(",\\s*")[15]);
                 psShipping.setString(5, recordsInfo[i].split(",\\s*")[13]);
                 psShipping.setString(6, recordsInfo[i].split(",\\s*")[17]);
-                psShipping.executeUpdate();
+                psShipping.addBatch();
                 //input retrieval
                 psRetrieval.setInt(1, i);
                 psRetrieval.setString(2, recordsInfo[i].split(",\\s*")[3]);
                 psRetrieval.setString(3, recordsInfo[i].split(",\\s*")[4]);
-                psRetrieval.executeUpdate();
+                psRetrieval.addBatch();
                 //input Delivery
                 psDelivery.setInt(1, i);
                 psDelivery.setString(2, recordsInfo[i].split(",\\s*")[5]);
                 psDelivery.setString(3, recordsInfo[i].split(",\\s*")[6]);
-                psDelivery.executeUpdate();
+                psDelivery.addBatch();
             }
-
-
+            psCompany.executeBatch();
+            psCity.executeBatch();
+            psStaff.executeBatch();
+            psShip.executeBatch();
+            psContainer.executeBatch();
+            psItem.executeBatch();
+            psExport.executeBatch();
+            psImport.executeBatch();
+            psShipping.executeBatch();
+            psRetrieval.executeBatch();
+            psDelivery.executeBatch();
         } catch (SQLException sqlException) {
             sqlException.printStackTrace();
         }

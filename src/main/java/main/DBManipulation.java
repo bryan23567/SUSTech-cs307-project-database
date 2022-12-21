@@ -431,10 +431,20 @@ public class DBManipulation implements IDatabaseManipulation {
 
     }
 
+    private static final String SET_ITEM_WAIT_FOR_CHECKING = """
+            update shipping
+            set item_state = 'Import Checking'
+            where item_id in (select id from item where name = ?)
+              and item_state = 'Unpacking from Container';
+            """;
 
     @Override
     public boolean itemWaitForChecking(LogInfo log, String item) {
-        return false;
+        if (!checkLog(log, LogInfo.StaffType.CompanyManager)) {
+            return false;
+        }
+
+        return update(SET_ITEM_WAIT_FOR_CHECKING, item);
     }
 
     @Override
@@ -591,7 +601,7 @@ public class DBManipulation implements IDatabaseManipulation {
     private static final String SET_ITEM_CHECK_STATE = "select check_item(?, ?, ?);";
     @Override
     public boolean setItemCheckState(@NotNull LogInfo log, @NotNull String itemName, boolean success) {
-        if (!checkLog(log, LogInfo.StaffType.SustcManager)) {
+        if (!checkLog(log, LogInfo.StaffType.SeaportOfficer)) {
             return false;
         }
 

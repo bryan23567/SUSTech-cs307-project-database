@@ -203,15 +203,15 @@ public class DBManipulation implements IDatabaseManipulation {
 
     private static final String CHECK_LOG = "SELECT type FROM staffs WHERE name = ? AND password = ? AND type = ?";
 
-    public boolean checkLog(@NotNull LogInfo log,  List<LogInfo.StaffType> type) {
+    public boolean checkLog(@NotNull LogInfo log,  @Nullable Object... args) {
         try (Connection connection = source.getConnection()) {
             try (PreparedStatement ps = connection.prepareStatement(CHECK_LOG)) {
                 ps.setString(1, log.name());
                 ps.setString(2, log.password());
                 ps.setString(3, log.type().toString());
                 if (ps.executeQuery().next()){
-                    for (LogInfo.StaffType logType:
-                         type) {
+                    for (@Nullable Object logType:
+                         args) {
                         if (logType == log.type())
                             return true;
 
@@ -343,7 +343,7 @@ public class DBManipulation implements IDatabaseManipulation {
     @Override
     public boolean loadContainerToShip(LogInfo log, String shipName, String containerCode) {
 
-        if (!checkLog(log,  List.of(LogInfo.StaffType.CompanyManager,LogInfo.StaffType.SustcManager))) {
+        if (!checkLog(log,  LogInfo.StaffType.CompanyManager)) {
             return false;
         }
 
@@ -378,16 +378,58 @@ public class DBManipulation implements IDatabaseManipulation {
         }
 
     }
-
+    private static final String FIND_SHIPPING_BY_SHIP = "Shipping.Id as id,,Item_State from shipping inner join ship on Shipping.Ship_Id = Ship.Id where Ship.Name = ?;";
     @Override
     public boolean shipStartSailing(LogInfo log, String shipName) {
+        if (!checkLog(log,  LogInfo.StaffType.CompanyManager)) {
+            return false;
+        }
+        if (!getShipInfo(log,shipName).owner().matches(getStaffInfo(log, log.name()).company())){
+            return false;
+        }
+        try (Connection connection = source.getConnection()) {
+            try (PreparedStatement ps = connection.prepareStatement(FIND_SHIPPING_BY_SHIP)) {
+                ps.setString(1,shipName);
+                ResultSet rs =ps.executeQuery();
+                while (rs.next()){
+                    if (rs.getString("item_state").matches(ItemState.WaitingForShipping.name())){
+                        return updateItemState(ItemState.Shipping,rs.getInt("id"));
+                    }
+                }
+            }
+            return false;
+        } catch (SQLException sqlException) {
+            sqlException.printStackTrace();
+            return false;
+        }
+    }
+//    private static final String FIND_SHIPPING_BY_ITEM =
+    @Override
+    public boolean unloadItem(LogInfo log, String itemName) {
+//        if (!checkLog(log,  LogInfo.StaffType.CompanyManager)) {
+//            return false;
+//        }
+//        if (!getShipInfo(log,shipName).owner().matches(getStaffInfo(log, log.name()).company())){
+//            return false;
+//        }
+//        try (Connection connection = source.getConnection()) {
+//            try (PreparedStatement ps = connection.prepareStatement(FIND_SHIPPING_BY_SHIP)) {
+//                ps.setString(1,shipName);
+//                ResultSet rs =ps.executeQuery();
+//                while (rs.next()){
+//                    if (rs.getString("item_state").matches(ItemState.WaitingForShipping.name())){
+//                        return updateItemState(ItemState.Shipping,rs.getInt("id"));
+//                    }
+//                }
+//            }
+//            return false;
+//        } catch (SQLException sqlException) {
+//            sqlException.printStackTrace();
+//            return false;
+//        }
         return false;
     }
 
-    @Override
-    public boolean unloadItem(LogInfo log, String itemName) {
-        return false;
-    }
 
     @Override
     public boolean itemWaitForChecking(LogInfo log, String item) {
@@ -526,7 +568,7 @@ public class DBManipulation implements IDatabaseManipulation {
             """;
     @Override
     public @Nullable String[] getAllItemsAtPort(@NotNull LogInfo log) {
-        if (!checkLog(log, List.of(LogInfo.StaffType.SeaportOfficer))) {
+        if (!checkLog(log, LogInfo.StaffType.SeaportOfficer)) {
             return null;
         }
 
@@ -536,7 +578,7 @@ public class DBManipulation implements IDatabaseManipulation {
     private static final String SET_ITEM_CHECK_STATE = "select check_item(?, ?, ?);";
     @Override
     public boolean setItemCheckState(@NotNull LogInfo log, @NotNull String itemName, boolean success) {
-        if (!checkLog(log, List.of(LogInfo.StaffType.SustcManager))) {
+        if (!checkLog(log, LogInfo.StaffType.SustcManager)) {
             return false;
         }
 
@@ -548,7 +590,7 @@ public class DBManipulation implements IDatabaseManipulation {
     @Override
     public int getCompanyCount(@NotNull LogInfo log) {
 
-        if (!checkLog(log,  List.of(LogInfo.StaffType.SustcManager))) {
+        if (!checkLog(log,  LogInfo.StaffType.SustcManager)) {
             return -1;
         }
         return getInt(GET_COMPANY_COUNT);
@@ -558,7 +600,7 @@ public class DBManipulation implements IDatabaseManipulation {
 
     @Override
     public int getCityCount(@NotNull LogInfo log) {
-        if (!checkLog(log,  List.of(LogInfo.StaffType.SustcManager))) {
+        if (!checkLog(log,  LogInfo.StaffType.SustcManager)) {
             return -1;
         }
 
@@ -569,7 +611,7 @@ public class DBManipulation implements IDatabaseManipulation {
 
     @Override
     public int getCourierCount(@NotNull LogInfo log) {
-        if (!checkLog(log,List.of(LogInfo.StaffType.SustcManager))) {
+        if (!checkLog(log,LogInfo.StaffType.SustcManager)) {
             return -1;
         }
 
@@ -580,7 +622,7 @@ public class DBManipulation implements IDatabaseManipulation {
 
     @Override
     public int getShipCount(@NotNull LogInfo log) {
-        if (!checkLog(log, List.of(LogInfo.StaffType.SustcManager))) {
+        if (!checkLog(log, LogInfo.StaffType.SustcManager)) {
             return -1;
         }
 
@@ -621,7 +663,7 @@ public class DBManipulation implements IDatabaseManipulation {
 
     @Override
     public @Nullable ItemInfo getItemInfo(@NotNull LogInfo log, @NotNull String name) {
-        if (!checkLog(log, List.of(LogInfo.StaffType.SustcManager))) {
+        if (!checkLog(log, LogInfo.StaffType.SustcManager)) {
             return null;
         }
 
@@ -675,7 +717,7 @@ public class DBManipulation implements IDatabaseManipulation {
 
     @Override
     public ShipInfo getShipInfo(LogInfo log, String name) {
-        if (!checkLog(log, List.of(LogInfo.StaffType.SustcManager,LogInfo.StaffType.CompanyManager))) {
+        if (!checkLog(log, LogInfo.StaffType.SustcManager,LogInfo.StaffType.CompanyManager)) {
             return null;
         }
         try (Connection connection = source.getConnection()) {

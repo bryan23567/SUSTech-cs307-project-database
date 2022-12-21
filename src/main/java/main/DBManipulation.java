@@ -203,18 +203,16 @@ public class DBManipulation implements IDatabaseManipulation {
 
     private static final String CHECK_LOG = "SELECT type FROM staffs WHERE name = ? AND password = ? AND type = ?";
 
-    public boolean checkLog(@NotNull LogInfo log,  @Nullable Object... args) {
+    public boolean checkLog(@NotNull LogInfo log,  @Nullable LogInfo.StaffType... args) {
         try (Connection connection = source.getConnection()) {
             try (PreparedStatement ps = connection.prepareStatement(CHECK_LOG)) {
                 ps.setString(1, log.name());
                 ps.setString(2, log.password());
                 ps.setString(3, log.type().toString());
                 if (ps.executeQuery().next()){
-                    for (@Nullable Object logType:
-                         args) {
+                    for (LogInfo.StaffType logType: args) {
                         if (logType == log.type())
                             return true;
-
                     }
                 }
                 return false;

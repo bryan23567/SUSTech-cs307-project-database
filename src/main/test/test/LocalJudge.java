@@ -60,10 +60,10 @@ public class LocalJudge {
             con.setAutoCommit(true);
             Statement stmt1 = con.createStatement();
             Statement stmt2 = con.createStatement();
-            ResultSet resultSet = stmt1.executeQuery("SELECT concat('DROP TABLE IF EXISTS ', table_name, ' CASCADE;') FROM information_schema.tables WHERE table_schema = 'public';");
-            while (resultSet.next()) {
-                stmt2.executeUpdate(resultSet.getString(1));
-            }
+//            ResultSet resultSet = stmt1.executeQuery("SELECT concat('DROP TABLE IF EXISTS ', table_name, ' CASCADE;') FROM information_schema.tables WHERE table_schema = 'public';");
+//            while (resultSet.next()) {
+//                stmt2.executeUpdate(resultSet.getString(1));
+//            }
             stmt1.close();
             stmt2.close();
             con.close();
@@ -132,11 +132,11 @@ public class LocalJudge {
     @Order(2)
     @Timeout(value = 80000, unit = TimeUnit.MILLISECONDS)
     public void importData() {
-        try {
-            manipulation.$import(readFile(recordsCSV), readFile(staffsCSV));
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+//        try {
+//            manipulation.$import(readFile(recordsCSV), readFile(staffsCSV));
+//        } catch (IOException e) {
+//            throw new RuntimeException(e);
+//        }
     }
 
     @Test

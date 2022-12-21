@@ -403,31 +403,34 @@ public class DBManipulation implements IDatabaseManipulation {
             return false;
         }
     }
-//    private static final String FIND_SHIPPING_BY_ITEM =
+    private static final String FIND_SHIPPING_BY_ITEM = "select foo.Id as id,Name,Item_State from ship inner join (select S.Item_Id,Item_State,Ship_Id,S.Id from item inner join Shipping S on Item.Id = S.Item_Id where Name = ? )as foo on foo.Ship_Id = Ship.Id;";
     @Override
     public boolean unloadItem(LogInfo log, String itemName) {
-//        if (!checkLog(log,  LogInfo.StaffType.CompanyManager)) {
-//            return false;
-//        }
-//        if (!getShipInfo(log,shipName).owner().matches(getStaffInfo(log, log.name()).company())){
-//            return false;
-//        }
-//        try (Connection connection = source.getConnection()) {
-//            try (PreparedStatement ps = connection.prepareStatement(FIND_SHIPPING_BY_SHIP)) {
-//                ps.setString(1,shipName);
-//                ResultSet rs =ps.executeQuery();
-//                while (rs.next()){
-//                    if (rs.getString("item_state").matches(ItemState.WaitingForShipping.name())){
-//                        return updateItemState(ItemState.Shipping,rs.getInt("id"));
-//                    }
-//                }
-//            }
-//            return false;
-//        } catch (SQLException sqlException) {
-//            sqlException.printStackTrace();
-//            return false;
-//        }
-        return false;
+        if (!checkLog(log,  LogInfo.StaffType.CompanyManager)) {
+            return false;
+        }
+
+
+        try (Connection connection = source.getConnection()) {
+            try (PreparedStatement ps = connection.prepareStatement(FIND_SHIPPING_BY_ITEM)) {
+                ps.setString(1,itemName);
+                ResultSet rs =ps.executeQuery();
+
+                while (rs.next()){
+                    if (!getShipInfo(log,rs.getString("name")).owner().matches(getStaffInfo(log, log.name()).company())){
+                        return false;
+                    }
+                    if (rs.getString("item_state").matches(ItemState.WaitingForShipping.name())){
+                        return updateItemState(ItemState.UnpackingFromContainer,rs.getInt("id"));
+                    }
+                }
+            }
+            return false;
+        } catch (SQLException sqlException) {
+            sqlException.printStackTrace();
+            return false;
+        }
+
     }
 
 

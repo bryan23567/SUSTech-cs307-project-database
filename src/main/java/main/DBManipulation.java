@@ -343,8 +343,7 @@ public class DBManipulation implements IDatabaseManipulation {
     @Override
     public boolean loadContainerToShip(LogInfo log, String shipName, String containerCode) {
 
-//
-        if (!checkLog(log,  List.of(LogInfo.StaffType.CompanyManager))) {
+        if (!checkLog(log,  List.of(LogInfo.StaffType.CompanyManager,LogInfo.StaffType.SustcManager))) {
             return false;
         }
 
@@ -352,10 +351,10 @@ public class DBManipulation implements IDatabaseManipulation {
         if (gSi.sailing()){
             return false;
         }
+
         if (!gSi.owner().matches(getStaffInfo(log, log.name()).company())){
             return false;
         }
-
         try (Connection connection = source.getConnection()) {
             try (PreparedStatement ps = connection.prepareStatement(FIND_ITEM)) {
                 ps.setString(1,containerCode);
@@ -676,7 +675,7 @@ public class DBManipulation implements IDatabaseManipulation {
 
     @Override
     public ShipInfo getShipInfo(LogInfo log, String name) {
-        if (!checkLog(log, List.of(LogInfo.StaffType.SustcManager))) {
+        if (!checkLog(log, List.of(LogInfo.StaffType.SustcManager,LogInfo.StaffType.CompanyManager))) {
             return null;
         }
         try (Connection connection = source.getConnection()) {

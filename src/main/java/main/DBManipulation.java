@@ -223,6 +223,29 @@ public class DBManipulation implements IDatabaseManipulation {
         }
     }
 
+
+    public boolean checkLog(@NotNull LogInfo log,  List<LogInfo.StaffType> type) {
+        try (Connection connection = source.getConnection()) {
+            try (PreparedStatement ps = connection.prepareStatement(CHECK_LOG)) {
+                ps.setString(1, log.name());
+                ps.setString(2, log.password());
+                ps.setString(3, log.type().toString());
+                if (ps.executeQuery().next()){
+                    for (LogInfo.StaffType logType:
+                            type) {
+                        if (logType == log.type())
+                            return true;
+
+                    }
+                }
+                return false;
+            }
+        } catch (SQLException sqlException) {
+            sqlException.printStackTrace();
+            return false;
+        }
+    }
+
     @SuppressWarnings("unchecked cast")
     public <T> T[] get(@NotNull String sql, @NotNull Class<T> clazz, @Nullable Object... args) {
         try (Connection connection = source.getConnection()) {
@@ -243,6 +266,23 @@ public class DBManipulation implements IDatabaseManipulation {
         } catch (SQLException | ClassCastException exception) {
             exception.printStackTrace();
             return null;
+        }
+    }
+    public double getImportTaxRate(LogInfo log, String city, String itemClass) {
+        String sql="select round(avg(tax/item.price),5) rate from item,import where import.id=item.id and city_id=(select id from city where city.name=?) and item.class=?";
+        try (Connection connection = source.getConnection()) {
+            try (PreparedStatement ps = connection.prepareStatement(sql)) {
+                ps.setString(1, city);
+                ps.setString(2, itemClass);
+                ResultSet rs = ps.executeQuery();
+                if (!rs.next()) {
+                    return -1;
+                }
+                return rs.getDouble("rate");
+            }
+        } catch (SQLException sqlException) {
+            sqlException.printStackTrace();
+            return -1;
         }
     }
     private boolean updateItemState(ItemState itemState,int shippingId){
@@ -323,14 +363,24 @@ public class DBManipulation implements IDatabaseManipulation {
         }
     }
 
-    @Override
-    public double getImportTaxRate(LogInfo log, String city, String itemClass) {
-        return 0;
-    }
 
     @Override
     public double getExportTaxRate(LogInfo log, String city, String itemClass) {
-        return 0;
+        String sql="select round(avg(tax/item.price),5) rate from item,export where export.id=item.id and city_id=(select id from city where city.name=?) and item.class=?";
+        try (Connection connection = source.getConnection()) {
+            try (PreparedStatement ps = connection.prepareStatement(sql)) {
+                ps.setString(1, city);
+                ps.setString(2, itemClass);
+                ResultSet rs = ps.executeQuery();
+                if (!rs.next()) {
+                    return -1;
+                }
+                return rs.getDouble("rate");
+            }
+        } catch (SQLException sqlException) {
+            sqlException.printStackTrace();
+            return -1;
+        }
     }
 
     @Override
@@ -376,7 +426,7 @@ public class DBManipulation implements IDatabaseManipulation {
         }
 
     }
-    private static final String FIND_SHIPPING_BY_SHIP = "Shipping.Id as id,,Item_State from shipping inner join ship on Shipping.Ship_Id = Ship.Id where Ship.Name = ?;";
+    private static final String FIND_SHIPPING_BY_SHIP = "Shipping.Id as id,Item_State from shipping inner join ship on Shipping.Ship_Id = Ship.Id where Ship.Name = ?;";
     @Override
     public boolean shipStartSailing(LogInfo log, String shipName) {
         if (!checkLog(log,  LogInfo.StaffType.CompanyManager)) {
@@ -447,9 +497,25 @@ public class DBManipulation implements IDatabaseManipulation {
         return update(SET_ITEM_WAIT_FOR_CHECKING, item);
     }
 
+    public static final String INSERT_ITEM_IFNOTEXIST = "insert into item(name,class,price) values(?,?,?) ";
     @Override
     public boolean newItem(LogInfo log, ItemInfo item) {
-        return false;
+        if (!checkLog(log,  List.of(LogInfo.StaffType.CompanyManager,LogInfo.StaffType.SustcManager,LogInfo.StaffType.Courier))) {
+            System.out.print(1);
+            return false;
+        }
+
+        try (Connection connection = source.getConnection()) {
+            PreparedStatement psItem = connection.prepareStatement(INPUT_ITEM);
+            psItem.setString(1,item.name() );
+            psItem.setString(2,item.$class() );
+            psItem.setDouble(3, item.price());
+            psItem.executeUpdate();
+            return true;
+
+        } catch (SQLException sqlException) {
+            return false;
+        }
     }
 
     @Override
@@ -768,11 +834,58 @@ public class DBManipulation implements IDatabaseManipulation {
 
     @Override
     public ContainerInfo getContainerInfo(LogInfo log, String code) {
-        return null;
+        try (Connection connection = source.getConnection()) {
+            String sql1="select * from container where code=?;";
+            try (PreparedStatement ps = connection.prepareStatement(sql1)) {
+                ps.setString(1, code);
+                ResultSet rs = ps.executeQuery();
+                if (!rs.next()) {
+                    return null;
+                }
+                String id = rs.getString("id");
+                String type = rs.getString("type");
+                String sql2="select * from shipping where container_id=? and item_state='Shipping'";
+                final PreparedStatement statement = connection.prepareStatement(sql2);
+                statement.setInt(1,Integer.valueOf(id));
+                final ResultSet set = statement.executeQuery();
+                ContainerInfo containerInfo=null;
+                if(type.startsWith("Dry")) return new ContainerInfo(ContainerInfo.Type.Dry,code,!set.next());
+                if(type.startsWith("ISO")) return new ContainerInfo(ContainerInfo.Type.ISOTank,code,!set.next());
+                if(type.startsWith("Open")) return new ContainerInfo(ContainerInfo.Type.OpenTop,code,!set.next());
+                if(type.startsWith("Flat")) return new ContainerInfo(ContainerInfo.Type.FlatRack,code,!set.next());
+                if(type.startsWith("Reefer")) return new ContainerInfo(ContainerInfo.Type.Reefer,code,!set.next());
+                return containerInfo;
+            }
+        } catch (SQLException sqlException) {
+            sqlException.printStackTrace();
+            return null;
+        }
     }
 
     @Override
     public StaffInfo getStaffInfo(LogInfo log, String name) {
-        return null;
+        try (Connection connection = source.getConnection()) {
+            String sql1="select staffs.name staff_name, staffs.type staff_type,staffs.password staff_pwd, c.name company_name,c2.name city_name,staffs.gender gender,staffs.age age,staffs.phone_number  phone_number from staffs left join company c on staffs.company_id = c.id left join city c2 on c2.id = staffs.city_id where staffs.name=?";
+            try (PreparedStatement ps = connection.prepareStatement(sql1)) {
+                ps.setString(1, name);
+                ResultSet rs = ps.executeQuery();
+                if (!rs.next()) {
+                    return null;
+                }
+                LogInfo logInfo=null;
+                String staff_type = rs.getString("staff_type");
+                String staff_pwd = rs.getString("staff_pwd");
+                String staff_name = rs.getString("staff_name");
+                if (staff_type.startsWith("Seaport")) logInfo=new LogInfo(staff_name, LogInfo.StaffType.SeaportOfficer,staff_pwd);
+                if (staff_type.startsWith("Company")) logInfo=new LogInfo(staff_name, LogInfo.StaffType.CompanyManager,staff_pwd);
+                if (staff_type.startsWith("SUSTC")) logInfo=new LogInfo(staff_name, LogInfo.StaffType.SustcManager,staff_pwd);
+                if (staff_type.startsWith("Courier")) logInfo=new LogInfo(staff_name, LogInfo.StaffType.Courier,staff_pwd);
+                System.out.print(rs.getString("gender"));
+                return  new StaffInfo(logInfo,rs.getString("company_name"), rs.getString("city_name"), rs.getString("gender").equals("female"),rs.getInt("age"),rs.getString("phone_number"));
+            }
+        } catch (SQLException sqlException) {
+            sqlException.printStackTrace();
+            return null;
+        }
     }
 }

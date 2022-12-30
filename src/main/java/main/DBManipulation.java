@@ -364,24 +364,7 @@ public class DBManipulation implements IDatabaseManipulation {
     }
 
 
-    @Override
-    public double getExportTaxRate(LogInfo log, String city, String itemClass) {
-        String sql="select round(avg(tax/item.price),5) rate from item,export where export.id=item.id and city_id=(select id from city where city.name=?) and item.class=?";
-        try (Connection connection = source.getConnection()) {
-            try (PreparedStatement ps = connection.prepareStatement(sql)) {
-                ps.setString(1, city);
-                ps.setString(2, itemClass);
-                ResultSet rs = ps.executeQuery();
-                if (!rs.next()) {
-                    return -1;
-                }
-                return rs.getDouble("rate");
-            }
-        } catch (SQLException sqlException) {
-            sqlException.printStackTrace();
-            return -1;
-        }
-    }
+
 
     @Override
     public boolean loadItemToContainer(LogInfo log, String itemName, String containerCode) {
@@ -497,30 +480,351 @@ public class DBManipulation implements IDatabaseManipulation {
         return update(SET_ITEM_WAIT_FOR_CHECKING, item);
     }
 
-    public static final String INSERT_ITEM_IFNOTEXIST = "insert into item(name,class,price) values(?,?,?) ";
+    public static final String INSERT_ITEM = "insert into item(name,class,price) values(?,?,?) ";
+
+    @Override
+    public double getExportTaxRate(LogInfo log, String city, String itemClass) {
+        String sql="select round(avg(tax/item.price),5) rate from item,export where export.id=item.id and city_id=(select id from city where city.name=?) and item.class=?";
+        try (Connection connection = source.getConnection()) {
+            try (PreparedStatement ps = connection.prepareStatement(sql)) {
+                ps.setString(1, city);
+                ps.setString(2, itemClass);
+                ResultSet rs = ps.executeQuery();
+                if (!rs.next()) {
+                    return -1;
+                }
+                return rs.getDouble("rate");
+            }
+        } catch (SQLException sqlException) {
+            sqlException.printStackTrace();
+            return -1;
+        }
+    }
+
+    public static int count = 1;
+
     @Override
     public boolean newItem(LogInfo log, ItemInfo item) {
-        if (!checkLog(log,  List.of(LogInfo.StaffType.CompanyManager,LogInfo.StaffType.SustcManager,LogInfo.StaffType.Courier))) {
-            System.out.print(1);
+        if (!checkLog(log,  List.of(LogInfo.StaffType.Courier))) {
+            System.out.println(1);
             return false;
         }
+        System.out.println(count++);
 
-        try (Connection connection = source.getConnection()) {
-            PreparedStatement psItem = connection.prepareStatement(INPUT_ITEM);
-            psItem.setString(1,item.name() );
-            psItem.setString(2,item.$class() );
-            psItem.setDouble(3, item.price());
-            psItem.executeUpdate();
-            return true;
+        if((!item.retrieval().city().equals(item.delivery().city()))&&(!item.export().city().equals(item.$import().city()))) {
+            double exportTax = getExportTaxRate(log,item.export().city(), item.$class());
+            double importTaxRate = getImportTaxRate(log,item.$import().city(), item.$class());
 
-        } catch (SQLException sqlException) {
+            if((int)(item.export().tax()/item.price()*100)==((int)(exportTax*100))
+                    &&(int)(item.$import().tax()/item.price()*100)==((int)(importTaxRate*100))) {
+
+                try (Connection connection = source.getConnection()) {
+
+                    PreparedStatement INSItem = connection.prepareStatement(
+                            "insert into item(name,class,price) values(?,?,?)"
+                    );
+                    INSItem.setString(1, item.name());
+                    INSItem.setString(2, item.$class());
+                    INSItem.setDouble(3, item.price());
+                    INSItem.executeUpdate();
+                    System.out.println(11);
+
+                    PreparedStatement SEItem = connection.prepareStatement(
+                            "select id from item where name = ?"
+                    );
+                    SEItem.setString(1, item.name());
+                    ResultSet rs8 = SEItem.executeQuery();
+                    if(!rs8.next()){
+                        return false;
+                    }
+                    int itemID = rs8.getInt("id");
+                    System.out.println(1101);
+
+                    PreparedStatement SEExportCityID = connection.prepareStatement(
+                            "select id from city where name = ?"
+                    );
+                    SEExportCityID.setString(1, item.export().city());
+                    ResultSet rs9 = SEExportCityID.executeQuery();
+
+                    if(!rs9.next()){
+                        return false;
+                    }
+
+                    int ExportCityID = rs9.getInt("id");
+                    System.out.println(1102);
+
+                    PreparedStatement SEImportCityID = connection.prepareStatement(
+                            "select id from city where name = ?"
+                    );
+                    SEImportCityID.setString(1, item.$import().city());
+                    ResultSet rs10 = SEImportCityID.executeQuery();
+                    if(!rs10.next()){
+                        return false;
+                    }
+                    int ImportCityID = rs10.getInt("id");
+                    System.out.println(1103);
+
+                    PreparedStatement SECourierID = connection.prepareStatement(
+                            "select Id from staffs  where Name = ? and Password = ? and Type = ?"
+                    );
+                    SECourierID.setString(1, log.name());
+                    SECourierID.setString(2, log.password());
+                    SECourierID.setString(3, LogInfo.StaffType.Courier.name());
+                    ResultSet rs3 = SECourierID.executeQuery();
+
+                    if(!rs3.next()){
+                        return false;
+                    }
+
+                    int courierID = rs3.getInt("Id");
+                    System.out.println(15);
+
+
+                    PreparedStatement INSExport = connection.prepareStatement(
+                            "insert into export(City_Id,Tax,Officer_id) values( ?,?,?)"
+                    );
+                    INSExport.setInt(1, ExportCityID);
+                    INSExport.setDouble(2, item.export().tax());
+                    INSExport.setInt(3,courierID);
+                    INSExport.executeUpdate();
+                    System.out.println(111);
+
+                    PreparedStatement INSImport = connection.prepareStatement(
+                            "insert into import(City_Id,Tax,Officer_id) values( ?,?,?)"
+                    );
+                    INSImport.setInt(1, ImportCityID);
+                    INSImport.setDouble(2, item.$import().tax());
+                    INSImport.setInt(3,courierID);
+                    INSImport.executeUpdate();
+                    System.out.println(112);
+
+                    PreparedStatement SEExportID = connection.prepareStatement(
+                            "select max(id) as mid from export  group by City_id having City_id = ?  "
+                    );
+                    SEExportID.setInt(1, ExportCityID);
+                    //SEExportID.setDouble(2,item.export().tax());
+                    ResultSet rs6 = SEExportID.executeQuery();
+
+                    if(!rs6.next()){
+                        return false;
+                    }
+
+                    int ExportID = rs6.getInt("mid");
+                    System.out.println(113);
+
+
+
+                    PreparedStatement SEImportID = connection.prepareStatement(
+                            "select max(id) as mid from import  group by City_id having City_id = ?  "
+                    );
+                    SEImportID.setInt(1, ImportCityID);
+                    //SEImportID.setDouble(2,item.$import().tax());
+                    ResultSet rs7 = SEImportID.executeQuery();
+
+                    if(!rs7.next()){
+                        return false;
+                    }
+
+                    int ImportID = rs7.getInt("mid");
+                    System.out.println(114);
+
+                    //insert into shipping(item_id,export_id,import_id,ship_id,container_id,item_state) values((select id from item where name = ?),(select id from export where city_id = (select id from city where name = ?)),(select id from import where city_id = (select id from city where name = ? )),(select id from ship where name = ?),(select id from container where code = ?),? )
+
+                    PreparedStatement psShipping = connection.prepareStatement(
+                            "insert into shipping(item_id,export_id,import_id,item_state) values(?,?,?,? )"
+                    );
+                    psShipping.setInt(1, itemID);
+                    psShipping.setInt(2, ExportID);
+                    psShipping.setInt(3, ImportID);
+                    psShipping.setString(4, "Picking-up");
+
+                    psShipping.executeUpdate();
+
+                    System.out.println(12);
+
+                    PreparedStatement SEShippingID = connection.prepareStatement(
+                            "select id from  shipping where item_id = ? "
+                    );
+
+                    SEShippingID.setInt(1, itemID);
+                    ResultSet rs = SEShippingID.executeQuery();
+
+                    if(!rs.next()){
+                        return false;
+                    }
+
+                    int shippingID = rs.getInt("id");
+                    System.out.println(13);
+
+
+
+                    PreparedStatement INSRetrieval = connection.prepareStatement(
+                            "insert into Retrieval(Shipping_Id,City_Id,Courier_Id) values(?,?,?)"
+                    );
+
+                    INSRetrieval.setInt(1,shippingID);
+                    INSRetrieval.setInt(2,ImportCityID);
+                    INSRetrieval.setInt(3,courierID);
+                    INSRetrieval.executeUpdate();
+                    System.out.println(16);
+
+                    PreparedStatement INSDelivery = connection.prepareStatement(
+                            "insert into Delivery(Shipping_Id,City_Id,courier_id) values(?,?,?)"
+                    );
+                    INSDelivery.setInt(1,shippingID);
+                    INSDelivery.setInt(2,ImportCityID);
+                    INSDelivery.setInt(3,courierID);
+                    INSDelivery.executeUpdate();
+                    System.out.println(17);
+
+                    return true;
+
+                } catch (SQLException sqlException) {
+                    System.out.println(2);
+                    System.out.println(sqlException);
+                    return false;
+                }
+            }
+            else{
+                System.out.println(3);
+                return false;
+            }
+
+        }
+        else {
+            System.out.println(4);
             return false;
         }
     }
 
     @Override
     public boolean setItemState(LogInfo log, String name, ItemState s) {
-        return false;
+        if (!checkLog(log,  List.of(LogInfo.StaffType.Courier))) {
+            System.out.println(1);
+            return false;
+        }
+
+        try (Connection connection = source.getConnection()) {
+
+            PreparedStatement SEItem = connection.prepareStatement(
+                    "select id from item where name = ?"
+            );
+            SEItem.setString(1, name);
+            ResultSet rs8 = SEItem.executeQuery();
+            if (!rs8.next()) {
+                return false;
+            }
+            int itemID = rs8.getInt("id");
+            System.out.println(1101);
+
+            PreparedStatement SECourierID = connection.prepareStatement(
+                    "select Id from staffs  where Name = ? and Password = ? and Type = ?"
+            );
+            SECourierID.setString(1, log.name());
+            SECourierID.setString(2, log.password());
+            SECourierID.setString(3, LogInfo.StaffType.Courier.name());
+            ResultSet rs3 = SECourierID.executeQuery();
+
+            if(!rs3.next()){
+                return false;
+            }
+
+            int courierID = rs3.getInt("Id");
+            System.out.println(15);
+
+            PreparedStatement SEShippingInfo = connection.prepareStatement(
+                    "select id, item_state from shipping  where item_id = ?"
+            );
+            SEShippingInfo.setInt(1,itemID);
+            ResultSet rs4 = SEShippingInfo.executeQuery();
+            if(!rs4.next()){
+                return false;
+            }
+            int shippingID = rs4.getInt("id");
+            String itemState = rs4.getString("item_state");
+
+            int rCourierID,dCourierID;
+
+            PreparedStatement SERetrievalInfo = connection.prepareStatement(
+                    "select courier_id from retrieval where shipping_id = ?"
+            );
+            SERetrievalInfo.setInt(1,shippingID);
+            ResultSet rs5 =  SERetrievalInfo.executeQuery();
+            if(!rs5.next()){
+                return false;
+            }
+            rCourierID = rs5.getInt("courier_id");
+
+            if(courierID == rCourierID){
+                if(itemState.equals("Picking-up")){
+                    //设置item state   "To-Export Transporting"
+                    PreparedStatement UPItemState = connection.prepareStatement("update shipping set item_state = 'To-Export Transporting' where id = ?");
+                    UPItemState.setInt(1,shippingID);
+                    UPItemState.executeUpdate();
+                }
+                else if(itemState.equals("To-Export Transporting")){
+                    //设置item state  "Export Checking"
+                    PreparedStatement UPItemState = connection.prepareStatement("update shipping set item_state = 'Export Checking' where id = ?");
+                    UPItemState.setInt(1,shippingID);
+                    UPItemState.executeUpdate();
+                }
+                else return false;
+            }else {
+                try{
+                    PreparedStatement SEDeliveryInfo = connection.prepareStatement(
+                            "select courier_id from delivery where shipping_id = ?"
+                    );
+                    SEDeliveryInfo.setInt(1,shippingID);
+                    ResultSet rs6 =  SEDeliveryInfo.executeQuery();
+                    if(!rs6.next()){
+                        return false;
+                    }
+                    dCourierID = rs5.getInt("courier_id");
+                }catch (SQLException e ){
+                    dCourierID = -1;
+                }catch (NullPointerException n){
+                    dCourierID = -1;
+                }
+
+                if(dCourierID==courierID){
+                    if(itemState.equals("From-Import Transporting")){
+                        //"From-Import Transporting" or "Delivering"
+                        PreparedStatement UPItemState = connection.prepareStatement("update shipping set item_state = 'Delivering' where id = ?");
+                        UPItemState.setInt(1,shippingID);
+                        UPItemState.executeUpdate();
+                    }
+                    else if(itemState.equals("Delivering")){
+                        //"Finish"
+                        PreparedStatement UPItemState = connection.prepareStatement("update shipping set item_state = 'Finish' where id = ?");
+                        UPItemState.setInt(1,shippingID);
+                        UPItemState.executeUpdate();
+                    }
+                    else return false;
+                }
+                else if((dCourierID ==-1||dCourierID==rCourierID)&&itemState.equals("From-Import Transporting")){
+                    //设置状态以及相应的id
+                    //"From-Import Transporting" or "Delivering"
+                    PreparedStatement UPItemState = connection.prepareStatement("update shipping set item_state = 'Delivering' where id = ?");
+                    UPItemState.setInt(1,shippingID);
+                    UPItemState.executeUpdate();
+
+                    PreparedStatement UPDelivery = connection.prepareStatement("update delivery set courier_id = ? where id = ?");
+                    UPDelivery.setInt(1,courierID);
+                    UPDelivery.setInt(2,shippingID);
+                    UPDelivery.executeUpdate();
+
+                }
+                else return false;
+
+            }
+
+            return true;
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+
     }
 
     public static final String INPUT_COMPANY = "insert into company(name) values(?)  ON CONFLICT DO NOTHING";

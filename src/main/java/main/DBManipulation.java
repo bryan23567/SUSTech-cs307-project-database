@@ -497,7 +497,7 @@ public class DBManipulation implements IDatabaseManipulation {
                                 ResultSet rs2 =ps2.executeQuery();
                                 rs2.next();
                                 if (getStaffInfo(log,rs2.getString("name")).company().matches(gSi.owner())){
-                                    if (update("update shipping set ship_id = (select id from ship where Name = ?) where shipping.id = ?;",shipName,rs.getInt("id"))){
+                                    if (update("update shipping set ship_id = (select id from ship where Name = ?) where shipping.id = ?;",shipName,rs.getInt("id")) && updateItemState(ItemState.WaitingForShipping,rs.getInt("id"))){
                                         return true;
                                     }
                                 }
@@ -514,7 +514,7 @@ public class DBManipulation implements IDatabaseManipulation {
         }
 
     }
-    private static final String FIND_SHIPPING_BY_SHIP = "       Shipping.Id as id,Item_State from shipping inner join ship on Shipping.Ship_Id = Ship.Id where Ship.Name = ?;";
+    private static final String FIND_SHIPPING_BY_SHIP = "select Shipping.Id as id,Item_State from shipping inner join ship on Shipping.Ship_Id = Ship.Id where Ship.Name = ?;";
     @Override
     public boolean shipStartSailing(LogInfo log, String shipName) {
         if (!checkLog(log,  LogInfo.StaffType.CompanyManager)) {
@@ -528,7 +528,7 @@ public class DBManipulation implements IDatabaseManipulation {
                 ps.setString(1,shipName);
                 ResultSet rs =ps.executeQuery();
                 while (rs.next()){
-                    if (rs.getString("item_state").matches(ItemState.WaitingForShipping.name())){
+                    if (rs.getString("item_state").matches(ItemState.WaitingForShipping.name)){
                         return updateItemState(ItemState.Shipping,rs.getInt("id"));
                     }
                 }

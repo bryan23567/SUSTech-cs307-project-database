@@ -288,7 +288,7 @@ public class DBManipulation implements IDatabaseManipulation {
     private boolean updateItemState(ItemState itemState,int shippingId){
         try (Connection connection = source.getConnection()) {
             try (PreparedStatement ps = connection.prepareStatement("update shipping set item_state = ? where id = ?")) {
-                ps.setString(1,itemState.name());
+                ps.setString(1,itemState.name);
                 ps.setInt(2,shippingId);
                 ps.executeUpdate();
                 return true;
@@ -515,6 +515,7 @@ public class DBManipulation implements IDatabaseManipulation {
 
     }
     private static final String FIND_SHIPPING_BY_SHIP = "select Shipping.Id as id,Item_State from shipping inner join ship on Shipping.Ship_Id = Ship.Id where Ship.Name = ?;";
+
     @Override
     public boolean shipStartSailing(LogInfo log, String shipName) {
         if (!checkLog(log,  LogInfo.StaffType.CompanyManager)) {
@@ -523,17 +524,23 @@ public class DBManipulation implements IDatabaseManipulation {
         if (!getShipInfo(log,shipName).owner().matches(getStaffInfo(log, log.name()).company())){
             return false;
         }
+        boolean isTrue = false;
         try (Connection connection = source.getConnection()) {
             try (PreparedStatement ps = connection.prepareStatement(FIND_SHIPPING_BY_SHIP)) {
                 ps.setString(1,shipName);
                 ResultSet rs =ps.executeQuery();
                 while (rs.next()){
+                    System.out.println(rs.getInt("id"));
+                    System.out.println(rs.getString("item_state"));
                     if (rs.getString("item_state").matches(ItemState.WaitingForShipping.name)){
-                        return updateItemState(ItemState.Shipping,rs.getInt("id"));
+                        if(updateItemState(ItemState.Shipping,rs.getInt("id"))){
+                            isTrue= true;
+                        }
                     }
                 }
             }
-            return false;
+            return isTrue;
+
         } catch (SQLException sqlException) {
             sqlException.printStackTrace();
             return false;
@@ -556,7 +563,7 @@ public class DBManipulation implements IDatabaseManipulation {
                     if (!getShipInfo(log,rs.getString("name")).owner().matches(getStaffInfo(log, log.name()).company())){
                         return false;
                     }
-                    if (rs.getString("item_state").matches(ItemState.WaitingForShipping.name())){
+                    if (rs.getString("item_state").matches(ItemState.Shipping.name)){
                         return updateItemState(ItemState.UnpackingFromContainer,rs.getInt("id"));
                     }
                 }

@@ -319,10 +319,12 @@ public class LocalJudge {
         Set<Map.Entry<List<Object>, Boolean>> entries = companyManagerUserTest.loadItemToContainer.entrySet();
         for (Map.Entry<List<Object>, Boolean> entry : entries) {
             List<Object> params = entry.getKey();
+
             assertEquals(entry.getValue(), manipulation.loadItemToContainer((LogInfo) params.get(0), (String) params.get(1), (String) params.get(2)));
         }
 
         ContainerInfo containerInfo = manipulation.getContainerInfo(logInfo, "c8458f8d");
+
         assertTrue(containerInfo.using());
     }
 

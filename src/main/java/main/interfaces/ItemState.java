@@ -22,7 +22,7 @@ public enum ItemState {
     FromImportTransporting("From-Import Transporting"),
     Delivering("Delivering"),
     Finish("Finish");
-    private final String name;
+    public final String name;
 
     ItemState(String name) {
         this.name = name;
@@ -36,4 +36,5 @@ public enum ItemState {
         }
         return null;
     }
+
 }

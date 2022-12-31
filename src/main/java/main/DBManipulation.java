@@ -368,9 +368,108 @@ public class DBManipulation implements IDatabaseManipulation {
 
     @Override
     public boolean loadItemToContainer(LogInfo log, String itemName, String containerCode) {
-        return false;
+
+        if (!checkLog(log,  LogInfo.StaffType.CompanyManager)) {
+            return false;
+        }
+
+        try (Connection connection = source.getConnection()) {
+            PreparedStatement SEItem = connection.prepareStatement(
+                    "select id from item where name = ?"
+            );
+            SEItem.setString(1, itemName);
+            ResultSet rs8 = SEItem.executeQuery();
+            if(!rs8.next()){
+                return false;
+            }
+            int itemID = rs8.getInt("id");
+            System.out.println(1101);
+
+
+            PreparedStatement SEContainerID = connection.prepareStatement(
+                    "select id from container where code = ?"
+            );
+            SEContainerID.setString(1, containerCode);
+            ResultSet rs9 = SEContainerID.executeQuery();
+            int ContainerID;
+            if (rs9.next()) {
+                ContainerID = rs9.getInt("id");
+            }
+            else{
+                PreparedStatement INSContainer = connection.prepareStatement(
+                        "insert into  container(code) values(?)"
+                );
+                INSContainer.setString(1,containerCode);
+                INSContainer.executeUpdate();
+                rs9 = SEContainerID.executeQuery();
+                ContainerID = rs9.getInt("id");
+            }
+
+            PreparedStatement SEShippingCheck = connection.prepareStatement(
+                    "select id from shipping where container_id = ?"
+            );
+            SEShippingCheck.setInt(1,ContainerID);
+            ResultSet rs1 = SEShippingCheck.executeQuery();
+            if(rs1.next()){
+                PreparedStatement SEShippingInfo = connection.prepareStatement(
+                        "select id , item_state from shipping where item_id = ?"
+                );
+                SEShippingInfo.setInt(1,itemID);
+                rs1 = SEShippingInfo.executeQuery();
+                if(!rs1.next()){
+                    return false;
+                }
+                int shippingID = rs1.getInt("id");
+                String itemState = rs1.getString("item_state");
+                if(itemState.equals("Packing to Container")){
+                    PreparedStatement UPItemState = connection.prepareStatement("update shipping set item_state = 'Packing to Container',container_id=? where id = ?");
+                    UPItemState.setInt(2,shippingID);
+                    UPItemState.setInt(1,ContainerID);
+                    UPItemState.executeUpdate();
+                    return true;
+                }
+                else return false;
+            }
+            else{
+                PreparedStatement SEShippingInfo = connection.prepareStatement(
+                        "select id , item_state from shipping where item_id = ?"
+                );
+                SEShippingInfo.setInt(1,itemID);
+                rs1 = SEShippingInfo.executeQuery();
+                if(!rs1.next()){
+                    return false;
+                }
+                int shippingID = rs1.getInt("id");
+                String itemState = rs1.getString("item_state");
+                if(itemState.equals("Export Checking")||itemState.equals("Packing to Container")){
+                    PreparedStatement UPItemState = connection.prepareStatement("update shipping set item_state = 'Packing to Container',container_id=? where id = ?");
+                    UPItemState.setInt(2,shippingID);
+                    UPItemState.setInt(1,ContainerID);
+                    UPItemState.executeUpdate();
+                    return true;
+                }
+                else return false;
+            }
+
+        }catch (SQLException e){
+            e.printStackTrace();
+            return false;
+        }
     }
+
+
     private static final String FIND_ITEM = "select Shipping.Id as id,Name,Item_State from shipping inner join Item I on Shipping.Item_Id = I.Id where Container_Id = (select id from container where Code = ?);";
+    private static final String FIND_RETRIEVAL_COURIER = """
+            select name
+            from staffs
+                     inner join (select Courier_Id
+                                 from retrieval
+                                          inner join (select Shipping.Id as id
+                                                      from shipping
+                                                               inner join Item I on Shipping.Item_Id = I.Id
+                                                      where I.name = ?) as foo on foo.id = Shipping_Id) as loo
+                                on loo.Courier_Id = staffs.id;
+            """;
     @Override
     public boolean loadContainerToShip(LogInfo log, String shipName, String containerCode) {
 
@@ -392,12 +491,18 @@ public class DBManipulation implements IDatabaseManipulation {
                 ResultSet rs =ps.executeQuery();
                 if (rs.next()){
                     do {
-                        if (rs.getString("item_state").matches(ItemState.PackingToContainer.name())){
-                            if (getStaffInfo(log,getItemInfo(log,rs.getString("name")).retrieval().courier()).company().matches(gSi.owner())){
-                                if (updateItemState(ItemState.PackingToContainer,rs.getInt("id"))){
-                                    return true;
+                        if (rs.getString("item_state").matches(ItemState.PackingToContainer.name)){
+                            try(PreparedStatement ps2 = connection.prepareStatement(FIND_RETRIEVAL_COURIER)) {
+                                ps2.setString(1,rs.getString("name"));
+                                ResultSet rs2 =ps2.executeQuery();
+                                rs2.next();
+                                if (getStaffInfo(log,rs2.getString("name")).company().matches(gSi.owner())){
+                                    if (update("update shipping set ship_id = (select id from ship where Name = ?) where shipping.id = ?;",shipName,rs.getInt("id"))){
+                                        return true;
+                                    }
                                 }
                             }
+
                         }
                     }while (rs.next());
                 }
@@ -409,7 +514,7 @@ public class DBManipulation implements IDatabaseManipulation {
         }
 
     }
-    private static final String FIND_SHIPPING_BY_SHIP = "Shipping.Id as id,Item_State from shipping inner join ship on Shipping.Ship_Id = Ship.Id where Ship.Name = ?;";
+    private static final String FIND_SHIPPING_BY_SHIP = "       Shipping.Id as id,Item_State from shipping inner join ship on Shipping.Ship_Id = Ship.Id where Ship.Name = ?;";
     @Override
     public boolean shipStartSailing(LogInfo log, String shipName) {
         if (!checkLog(log,  LogInfo.StaffType.CompanyManager)) {
@@ -1056,7 +1161,7 @@ public class DBManipulation implements IDatabaseManipulation {
 
     @Override
     public @Nullable ItemInfo getItemInfo(@NotNull LogInfo log, @NotNull String name) {
-        if (!checkLog(log, LogInfo.StaffType.SustcManager)) {
+        if (!checkLog(log, LogInfo.StaffType.SustcManager,LogInfo.StaffType.CompanyManager)) {
             return null;
         }
 
